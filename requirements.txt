@@ -1,0 +1,27 @@
+# PsyInsight Commander - 필수 라이브러리
+
+# 웹 프레임워크
+streamlit>=1.28.0
+
+# AI 엔진
+google-generativeai>=0.3.0
+
+# 로깅 (내장 라이브러리 사용)
+# 추가 설치 불필요
+
+# 데이터 수집
+feedparser>=6.0.10
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+
+# 논문 수집
+biopython>=1.81
+
+# 환경 변수 관리
+python-dotenv>=1.0.0
+
+# 이메일 발송 (내장 라이브러리 사용 - smtplib, email.mime)
+# 추가 설치 불필요
+
+# 데이터베이스 (내장 - sqlite3)
+# 추가 설치 불필요

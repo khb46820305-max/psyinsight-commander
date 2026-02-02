@@ -1,0 +1,330 @@
+"""
+AI 엔진 모듈
+Google Gemini API를 사용하여 텍스트 요약, 평가, 키워드 추출 등을 수행
+"""
+
+import os
+import json
+import logging
+from typing import Dict, List, Optional
+import google.generativeai as genai
+from dotenv import load_dotenv
+
+# 환경 변수 로드
+load_dotenv()
+
+# 로깅 설정
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Gemini API 클라이언트 초기화
+def init_gemini_client():
+    """Gemini API 클라이언트 초기화"""
+    api_key = os.getenv("GEMINI_API_KEY")
+    
+    if not api_key:
+        # Streamlit Secrets에서도 시도
+        try:
+            import streamlit as st
+            if hasattr(st, 'secrets') and 'GEMINI_API_KEY' in st.secrets:
+                api_key = st.secrets['GEMINI_API_KEY']
+        except:
+            pass
+    
+    if not api_key:
+        raise ValueError("GEMINI_API_KEY가 환경 변수에 설정되지 않았습니다. .env 파일을 확인하세요.")
+    
+    genai.configure(api_key=api_key)
+    logger.info("Gemini API 클라이언트 초기화 완료")
+    return genai
+
+
+def get_model(model_name: str = "gemini-1.5-flash"):
+    """Gemini 모델 반환"""
+    try:
+        client = init_gemini_client()
+        return genai.GenerativeModel(model_name)
+    except Exception as e:
+        logger.error(f"모델 초기화 실패: {e}")
+        raise
+
+
+def generate_summary(text: str, max_retries: int = 3) -> str:
+    """
+    텍스트를 3줄로 요약
+    
+    Args:
+        text: 요약할 텍스트
+        max_retries: 최대 재시도 횟수
+    
+    Returns:
+        3줄 요약 문자열
+    """
+    prompt = f"""다음 뉴스 기사를 3줄로 요약해주세요. 각 줄은 핵심 내용을 간결하게 담아야 합니다.
+
+기사 내용:
+{text}
+
+요약:"""
+    
+    for attempt in range(max_retries):
+        try:
+            model = get_model()
+            response = model.generate_content(
+                prompt,
+                generation_config={
+                    "temperature": 0.3,
+                    "max_output_tokens": 300,
+                }
+            )
+            summary = response.text.strip()
+            logger.info("요약 생성 완료")
+            return summary
+        except Exception as e:
+            logger.warning(f"요약 생성 실패 (시도 {attempt + 1}/{max_retries}): {e}")
+            if attempt == max_retries - 1:
+                return "요약 생성에 실패했습니다."
+            import time
+            time.sleep(2 ** attempt)  # 지수 백오프
+
+
+def evaluate_article(text: str, max_retries: int = 3) -> Dict:
+    """
+    기사의 전문성을 평가 (1~5점)
+    
+    평가 기준:
+    - 과학적 연구 근거 여부
+    - 연구 타당도 (표본 크기, 방법론)
+    - 선행 연구 인용 여부
+    - 일반상식 vs 근거기반 논리
+    
+    Args:
+        text: 평가할 기사 텍스트
+        max_retries: 최대 재시도 횟수
+    
+    Returns:
+        {"score": int, "reason": str} 형태의 딕셔너리
+    """
+    prompt = f"""다음 뉴스 기사를 사회과학 논문의 신뢰도 및 타당도 평가 기준에 따라 평가해주세요.
+
+평가 기준:
+1. 과학적 연구가 이루어졌는지 / 근거보다는 일반상식에 바탕하는지
+2. 연구가 타당한지 / 경험 및 선행보고가 충분한지
+3. 저명학회지에 게재 가능한 수준의 근거기반 논리인지
+
+기사 내용:
+{text}
+
+다음 JSON 형식으로 응답해주세요:
+{{
+    "score": 1~5 사이의 정수,
+    "reason": "평가 근거를 간단히 설명"
+}}"""
+    
+    for attempt in range(max_retries):
+        try:
+            model = get_model()
+            response = model.generate_content(
+                prompt,
+                generation_config={
+                    "temperature": 0.2,
+                    "max_output_tokens": 200,
+                }
+            )
+            
+            # JSON 파싱 시도
+            response_text = response.text.strip()
+            
+            # JSON 블록 추출 (```json ... ``` 형식일 수 있음)
+            if "```json" in response_text:
+                response_text = response_text.split("```json")[1].split("```")[0].strip()
+            elif "```" in response_text:
+                response_text = response_text.split("```")[1].split("```")[0].strip()
+            
+            result = json.loads(response_text)
+            
+            # 점수 검증
+            score = int(result.get("score", 3))
+            if score < 1 or score > 5:
+                score = 3
+            
+            logger.info(f"기사 평가 완료: {score}점")
+            return {
+                "score": score,
+                "reason": result.get("reason", "평가 완료")
+            }
+        except json.JSONDecodeError as e:
+            logger.warning(f"JSON 파싱 실패 (시도 {attempt + 1}/{max_retries}): {e}")
+            # JSON 파싱 실패 시 기본값 반환
+            if attempt == max_retries - 1:
+                return {"score": 3, "reason": "평가 중 오류 발생"}
+        except Exception as e:
+            logger.warning(f"평가 실패 (시도 {attempt + 1}/{max_retries}): {e}")
+            if attempt == max_retries - 1:
+                return {"score": 3, "reason": "평가 중 오류 발생"}
+            import time
+            time.sleep(2 ** attempt)
+
+
+def extract_keywords(text: str, max_keywords: int = 5, max_retries: int = 3) -> List[str]:
+    """
+    텍스트에서 핵심 키워드 추출
+    
+    Args:
+        text: 키워드를 추출할 텍스트
+        max_keywords: 추출할 키워드 개수
+        max_retries: 최대 재시도 횟수
+    
+    Returns:
+        키워드 리스트
+    """
+    prompt = f"""다음 텍스트에서 핵심 키워드를 {max_keywords}개 추출해주세요.
+
+텍스트:
+{text}
+
+다음 JSON 형식으로 응답해주세요:
+{{
+    "keywords": ["키워드1", "키워드2", ...]
+}}"""
+    
+    for attempt in range(max_retries):
+        try:
+            model = get_model()
+            response = model.generate_content(
+                prompt,
+                generation_config={
+                    "temperature": 0.3,
+                    "max_output_tokens": 200,
+                }
+            )
+            
+            response_text = response.text.strip()
+            
+            # JSON 블록 추출
+            if "```json" in response_text:
+                response_text = response_text.split("```json")[1].split("```")[0].strip()
+            elif "```" in response_text:
+                response_text = response_text.split("```")[1].split("```")[0].strip()
+            
+            result = json.loads(response_text)
+            keywords = result.get("keywords", [])
+            
+            # 최대 개수 제한
+            keywords = keywords[:max_keywords]
+            
+            logger.info(f"키워드 추출 완료: {len(keywords)}개")
+            return keywords
+        except json.JSONDecodeError as e:
+            logger.warning(f"JSON 파싱 실패 (시도 {attempt + 1}/{max_retries}): {e}")
+            if attempt == max_retries - 1:
+                # 기본 키워드 추출 시도 (간단한 방법)
+                words = text.split()[:max_keywords]
+                return words
+        except Exception as e:
+            logger.warning(f"키워드 추출 실패 (시도 {attempt + 1}/{max_retries}): {e}")
+            if attempt == max_retries - 1:
+                return []
+            import time
+            time.sleep(2 ** attempt)
+
+
+def summarize_paper(abstract: str, max_retries: int = 3) -> Dict:
+    """
+    논문 초록을 요약 (연구 목적, 방법, 결과, 시사점)
+    
+    Args:
+        abstract: 논문 초록
+        max_retries: 최대 재시도 횟수
+    
+    Returns:
+        {
+            "purpose": str,
+            "method": str,
+            "result": str,
+            "implication": str
+        } 형태의 딕셔너리
+    """
+    prompt = f"""다음 논문 초록을 읽고 연구 목적, 방법, 결과, 시사점으로 구조화하여 요약해주세요.
+
+초록:
+{abstract}
+
+다음 JSON 형식으로 응답해주세요:
+{{
+    "purpose": "연구 목적",
+    "method": "연구 방법",
+    "result": "주요 결과",
+    "implication": "시사점"
+}}"""
+    
+    for attempt in range(max_retries):
+        try:
+            model = get_model()
+            response = model.generate_content(
+                prompt,
+                generation_config={
+                    "temperature": 0.2,
+                    "max_output_tokens": 500,
+                }
+            )
+            
+            response_text = response.text.strip()
+            
+            # JSON 블록 추출
+            if "```json" in response_text:
+                response_text = response_text.split("```json")[1].split("```")[0].strip()
+            elif "```" in response_text:
+                response_text = response_text.split("```")[1].split("```")[0].strip()
+            
+            result = json.loads(response_text)
+            
+            logger.info("논문 요약 완료")
+            return {
+                "purpose": result.get("purpose", ""),
+                "method": result.get("method", ""),
+                "result": result.get("result", ""),
+                "implication": result.get("implication", "")
+            }
+        except json.JSONDecodeError as e:
+            logger.warning(f"JSON 파싱 실패 (시도 {attempt + 1}/{max_retries}): {e}")
+            if attempt == max_retries - 1:
+                return {
+                    "purpose": "파싱 실패",
+                    "method": "",
+                    "result": "",
+                    "implication": ""
+                }
+        except Exception as e:
+            logger.warning(f"논문 요약 실패 (시도 {attempt + 1}/{max_retries}): {e}")
+            if attempt == max_retries - 1:
+                return {
+                    "purpose": "요약 실패",
+                    "method": "",
+                    "result": "",
+                    "implication": ""
+                }
+            import time
+            time.sleep(2 ** attempt)
+
+
+# 테스트 코드
+if __name__ == "__main__":
+    # 간단한 테스트
+    test_text = "최신 연구에 따르면 정기적인 운동이 우울증 증상을 완화하는 데 도움이 된다고 합니다."
+    
+    print("=== AI 엔진 테스트 ===")
+    print(f"\n원문: {test_text}")
+    
+    print("\n1. 요약 테스트:")
+    summary = generate_summary(test_text)
+    print(f"요약: {summary}")
+    
+    print("\n2. 평가 테스트:")
+    evaluation = evaluate_article(test_text)
+    print(f"점수: {evaluation['score']}/5")
+    print(f"근거: {evaluation['reason']}")
+    
+    print("\n3. 키워드 추출 테스트:")
+    keywords = extract_keywords(test_text)
+    print(f"키워드: {keywords}")

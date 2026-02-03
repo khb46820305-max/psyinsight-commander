@@ -1100,8 +1100,8 @@ elif selected_menu == "🧪 테스트":
                 conn = get_connection()
                 cursor = conn.cursor()
                 cursor.execute("""
-                    SELECT id, title, date, country, url, content_summary, keywords, rating
-                    FROM news
+                    SELECT id, title, date, country, url, content_summary, keywords, validity_score
+                    FROM articles
                     WHERE country = 'KR'
                     ORDER BY created_at DESC
                     LIMIT 1
@@ -1124,8 +1124,8 @@ elif selected_menu == "🧪 테스트":
                 conn = get_connection()
                 cursor = conn.cursor()
                 cursor.execute("""
-                    SELECT id, title, date, country, url, content_summary, keywords, rating, translated_title, summary_korean
-                    FROM news
+                    SELECT id, title, date, country, url, content_summary, keywords, validity_score
+                    FROM articles
                     WHERE country = 'US'
                     ORDER BY created_at DESC
                     LIMIT 1
@@ -1148,9 +1148,9 @@ elif selected_menu == "🧪 테스트":
                 conn = get_connection()
                 cursor = conn.cursor()
                 cursor.execute("""
-                    SELECT id, title, date, source, url, abstract, keywords, abstract_korean
+                    SELECT id, title, date, journal, url, abstract, keywords
                     FROM papers
-                    WHERE source = 'arXiv'
+                    WHERE journal LIKE '%arXiv%' OR url LIKE '%arxiv%'
                     ORDER BY created_at DESC
                     LIMIT 2
                 """)
@@ -1173,9 +1173,9 @@ elif selected_menu == "🧪 테스트":
                 for news in test_results["kr_news"]:
                     news_id, title, date, country, url, summary, keywords, rating = news
                     st.markdown(f"**{title}**")
-                    st.markdown(f"📅 {date} | ⭐ {rating}/5")
+                    st.markdown(f"📅 {date} | 🌍 {country} | ⭐ {rating}/5")
                     if summary:
-                        st.markdown(f"요약: {summary[:100]}...")
+                        st.markdown(f"요약: {summary[:150]}...")
                     if url:
                         st.markdown(f"[원문 보기 →]({url})")
                     st.markdown("---")
@@ -1184,54 +1184,27 @@ elif selected_menu == "🧪 테스트":
             if test_results["us_news"]:
                 st.markdown("#### 🌍 외국 뉴스")
                 for news in test_results["us_news"]:
-                    if len(news) >= 10:
-                        news_id, title, date, country, url, summary, keywords, rating, translated_title, summary_korean = news
-                        if translated_title:
-                            st.markdown(f"**{translated_title}** (원제: {title})")
-                        else:
-                            st.markdown(f"**{title}**")
-                        st.markdown(f"📅 {date} | ⭐ {rating}/5")
-                        if summary_korean:
-                            st.markdown(f"요약: {summary_korean}")
-                        elif summary:
-                            st.markdown(f"요약: {summary[:100]}...")
-                        if url:
-                            st.markdown(f"[원문 보기 →]({url})")
-                    else:
-                        news_id, title, date, country, url, summary, keywords, rating = news
-                        st.markdown(f"**{title}**")
-                        st.markdown(f"📅 {date} | ⭐ {rating}/5")
-                        if summary:
-                            st.markdown(f"요약: {summary[:100]}...")
-                        if url:
-                            st.markdown(f"[원문 보기 →]({url})")
+                    news_id, title, date, country, url, summary, keywords, rating = news
+                    st.markdown(f"**{title}**")
+                    st.markdown(f"📅 {date} | 🌍 {country} | ⭐ {rating}/5")
+                    if summary:
+                        st.markdown(f"요약: {summary[:150]}...")
+                    if url:
+                        st.markdown(f"[원문 보기 →]({url})")
                     st.markdown("---")
             
             # 논문 표시
             if test_results["papers"]:
                 st.markdown("#### 📚 논문")
                 for paper in test_results["papers"]:
-                    if len(paper) >= 8:
-                        paper_id, title, date, source, url, abstract, keywords, abstract_korean = paper
-                        st.markdown(f"**{title}**")
-                        st.markdown(f"📅 {date} | 📖 {source}")
-                        if abstract_korean:
-                            with st.expander("📄 Abstract (한국어 번역)"):
-                                st.markdown(f"**원문:**\n{abstract[:500]}...")
-                                st.markdown(f"**한국어 번역:**\n{abstract_korean}")
-                        else:
-                            with st.expander("📄 Abstract"):
-                                st.markdown(abstract[:500] + "..." if len(abstract) > 500 else abstract)
-                        if url:
-                            st.markdown(f"[원문 보기 →]({url})")
-                    else:
-                        paper_id, title, date, source, url, abstract, keywords = paper
-                        st.markdown(f"**{title}**")
-                        st.markdown(f"📅 {date} | 📖 {source}")
+                    paper_id, title, date, journal, url, abstract, keywords = paper
+                    st.markdown(f"**{title}**")
+                    st.markdown(f"📅 {date} | 📖 {journal}")
+                    if abstract:
                         with st.expander("📄 Abstract"):
                             st.markdown(abstract[:500] + "..." if len(abstract) > 500 else abstract)
-                        if url:
-                            st.markdown(f"[원문 보기 →]({url})")
+                    if url:
+                        st.markdown(f"[원문 보기 →]({url})")
                     st.markdown("---")
             
             if not test_results["kr_news"] and not test_results["us_news"] and not test_results["papers"]:

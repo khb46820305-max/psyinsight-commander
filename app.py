@@ -454,33 +454,24 @@ with tab2:
                     # 논문 Abstract 펼쳐보기 (제목 아래에 펼쳐지게)
                     if abstract:
                         with st.expander("📄 논문 Abstract 펼쳐보기", expanded=False):
-                            # 외국 논문인 경우 해석된 요약도 표시
-                            if summary and summary.get("purpose"):
-                                st.markdown("**🔍 AI 해석 요약:**")
-                                if summary.get("purpose"):
-                                    st.markdown(f"<p style='font-size: 11px; margin-bottom: 3px;'><strong>목적:</strong> {summary['purpose']}</p>", unsafe_allow_html=True)
-                                if summary.get("method"):
-                                    st.markdown(f"<p style='font-size: 11px; margin-bottom: 3px;'><strong>방법:</strong> {summary['method']}</p>", unsafe_allow_html=True)
-                                if summary.get("result"):
-                                    st.markdown(f"<p style='font-size: 11px; margin-bottom: 3px;'><strong>결과:</strong> {summary['result']}</p>", unsafe_allow_html=True)
-                                if summary.get("implication"):
-                                    st.markdown(f"<p style='font-size: 11px; margin-bottom: 8px;'><strong>시사점:</strong> {summary['implication']}</p>", unsafe_allow_html=True)
-                                st.markdown("---")
-                            
-                            # 원본 Abstract
-                            st.markdown("**📄 원본 Abstract:**")
-                            st.markdown(f"<p style='font-size: 11px; line-height: 1.6;'>{abstract}</p>", unsafe_allow_html=True)
-                    elif summary and summary.get("purpose"):
-                        # Abstract가 없지만 해석된 요약이 있는 경우
-                        with st.expander("📋 AI 해석 요약", expanded=False):
-                            if summary.get("purpose"):
-                                st.markdown(f"<p style='font-size: 11px; margin-bottom: 3px;'><strong>목적:</strong> {summary['purpose']}</p>", unsafe_allow_html=True)
-                            if summary.get("method"):
-                                st.markdown(f"<p style='font-size: 11px; margin-bottom: 3px;'><strong>방법:</strong> {summary['method']}</p>", unsafe_allow_html=True)
-                            if summary.get("result"):
-                                st.markdown(f"<p style='font-size: 11px; margin-bottom: 3px;'><strong>결과:</strong> {summary['result']}</p>", unsafe_allow_html=True)
-                            if summary.get("implication"):
-                                st.markdown(f"<p style='font-size: 11px; margin-bottom: 3px;'><strong>시사점:</strong> {summary['implication']}</p>", unsafe_allow_html=True)
+                            # Abstract에 번역이 포함되어 있는지 확인
+                            if "[원문]" in abstract and "[한국어 번역]" in abstract:
+                                # 외국 논문: 원문과 번역 병기
+                                parts = abstract.split("[한국어 번역]")
+                                if len(parts) == 2:
+                                    original = parts[0].replace("[원문]", "").strip()
+                                    translated = parts[1].strip()
+                                    st.markdown("**📄 원본 Abstract (영문):**")
+                                    st.markdown(f"<p style='font-size: 11px; line-height: 1.6;'>{original}</p>", unsafe_allow_html=True)
+                                    st.markdown("---")
+                                    st.markdown("**🇰🇷 한국어 번역:**")
+                                    st.markdown(f"<p style='font-size: 11px; line-height: 1.6;'>{translated}</p>", unsafe_allow_html=True)
+                                else:
+                                    st.markdown(f"<p style='font-size: 11px; line-height: 1.6;'>{abstract}</p>", unsafe_allow_html=True)
+                            else:
+                                # 한국 논문: 원문만 표시
+                                st.markdown("**📄 논문 Abstract:**")
+                                st.markdown(f"<p style='font-size: 11px; line-height: 1.6;'>{abstract}</p>", unsafe_allow_html=True)
                     
                     # 저자 정보
                     if authors:

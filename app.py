@@ -670,21 +670,23 @@ with tab3:
                 
                 progress_bar.progress(1.0)
                 status_text.text("완료! (100%)")
+                
+                if generated_content:
+                    st.success("✅ 콘텐츠 생성 완료!")
+                    st.markdown("### 생성된 콘텐츠")
+                    st.markdown(f"**템플릿:** {template}")
+                    st.text_area("생성된 콘텐츠", generated_content, height=400, key="generated_content")
                     
-                    if generated_content:
-                        st.success("✅ 콘텐츠 생성 완료!")
-                        st.markdown("### 생성된 콘텐츠")
-                        st.markdown(f"**템플릿:** {template}")
-                        st.text_area("생성된 콘텐츠", generated_content, height=400, key="generated_content")
-                        
-                        # 복사용 코드 블록
-                        st.markdown("**복사용:**")
-                        st.code(generated_content, language=None)
-                    else:
-                        st.error("콘텐츠 생성에 실패했습니다. 다시 시도해주세요.")
-                    
-                except Exception as e:
-                    st.error(f"콘텐츠 생성 실패: {e}")
+                    # 복사용 코드 블록
+                    st.markdown("**복사용:**")
+                    st.code(generated_content, language=None)
+                else:
+                    st.error("콘텐츠 생성에 실패했습니다. 다시 시도해주세요.")
+                
+            except Exception as e:
+                st.error(f"콘텐츠 생성 실패: {e}")
+                import traceback
+                st.code(traceback.format_exc())
     
     # 맨 위로 버튼
     st.markdown("<div style='text-align: center; margin: 30px 0; padding: 20px;'>", unsafe_allow_html=True)

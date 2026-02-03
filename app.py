@@ -913,40 +913,40 @@ elif selected_menu == "📈 경제 흐름 파악":
                         progress_bar.progress(progress)
                         status_text.text(f"{message} ({current}/{total}) - {int(progress * 100)}%")
                     
-                collected, saved = collect_economy_news(progress_callback=update_progress)
-                progress_bar.progress(0.9)
-                status_text.text(f"✅ 수집 완료: {collected}개 수집, {saved}개 저장")
-                
-                # 수집 완료 후 자동으로 보고서 생성 시도
-                if saved > 0:
-                    status_text.text("📊 종합 보고서 자동 생성 중...")
-                    try:
-                        from modules.economy_collector import generate_daily_economy_report
-                        from datetime import datetime
-                        
-                        report = generate_daily_economy_report(force_regenerate=False)
-                        
-                        if report:
-                            st.session_state['economy_report'] = report
-                            st.session_state['economy_report_date'] = datetime.now().strftime("%Y-%m-%d")
-                            status_text.text(f"✅ 수집 완료: {collected}개 수집, {saved}개 저장 | 📊 보고서 자동 생성 완료")
-                            st.success(f"✅ 수집 완료: {collected}개 수집, {saved}개 저장\n📊 종합 보고서가 자동으로 생성되었습니다!")
-                        else:
+                    collected, saved = collect_economy_news(progress_callback=update_progress)
+                    progress_bar.progress(0.9)
+                    status_text.text(f"✅ 수집 완료: {collected}개 수집, {saved}개 저장")
+                    
+                    # 수집 완료 후 자동으로 보고서 생성 시도
+                    if saved > 0:
+                        status_text.text("📊 종합 보고서 자동 생성 중...")
+                        try:
+                            from modules.economy_collector import generate_daily_economy_report
+                            from datetime import datetime
+                            
+                            report = generate_daily_economy_report(force_regenerate=False)
+                            
+                            if report:
+                                st.session_state['economy_report'] = report
+                                st.session_state['economy_report_date'] = datetime.now().strftime("%Y-%m-%d")
+                                status_text.text(f"✅ 수집 완료: {collected}개 수집, {saved}개 저장 | 📊 보고서 자동 생성 완료")
+                                st.success(f"✅ 수집 완료: {collected}개 수집, {saved}개 저장\n📊 종합 보고서가 자동으로 생성되었습니다!")
+                            else:
+                                status_text.text(f"✅ 수집 완료: {collected}개 수집, {saved}개 저장")
+                                st.success(f"✅ 수집 완료: {collected}개 수집, {saved}개 저장")
+                        except Exception as e:
+                            logger.error(f"보고서 자동 생성 실패: {e}")
                             status_text.text(f"✅ 수집 완료: {collected}개 수집, {saved}개 저장")
                             st.success(f"✅ 수집 완료: {collected}개 수집, {saved}개 저장")
-                    except Exception as e:
-                        logger.error(f"보고서 자동 생성 실패: {e}")
+                    else:
                         status_text.text(f"✅ 수집 완료: {collected}개 수집, {saved}개 저장")
                         st.success(f"✅ 수집 완료: {collected}개 수집, {saved}개 저장")
-                else:
-                    status_text.text(f"✅ 수집 완료: {collected}개 수집, {saved}개 저장")
-                    st.success(f"✅ 수집 완료: {collected}개 수집, {saved}개 저장")
-                
-                progress_bar.progress(1.0)
-            except Exception as e:
-                st.error(f"❌ 오류 발생: {e}")
-                import traceback
-                st.code(traceback.format_exc())
+                    
+                    progress_bar.progress(1.0)
+                except Exception as e:
+                    st.error(f"❌ 오류 발생: {e}")
+                    import traceback
+                    st.code(traceback.format_exc())
         
         with col_btn2:
             col_report1, col_report2 = st.columns([1, 1])

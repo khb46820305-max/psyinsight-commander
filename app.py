@@ -18,10 +18,11 @@ st.title("🧠 PsyInsight Commander")
 st.markdown("### 심리 인사이트 통합 지휘소")
 
 # 탭 생성
-tab1, tab2, tab3 = st.tabs([
-    "📰 Tab 1: 사이콜로지 트랜드 레이더",
-    "📚 Tab 2: 아카데믹 아카이브",
-    "✨ Tab 3: 콘텐츠 팩토리"
+tab1, tab2, tab3, tab4 = st.tabs([
+    "📰 사이콜로지 트랜드 레이더",
+    "📚 아카데믹 아카이브",
+    "✨ 콘텐츠 팩토리",
+    "🗑️ 수집 내용 관리"
 ])
 
 # Tab 1: 사이콜로지 트랜드 레이더

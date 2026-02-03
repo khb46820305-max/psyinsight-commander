@@ -73,7 +73,7 @@ with tab1:
     with col2:
         col_btn1, col_btn2 = st.columns([1, 1])
         with col_btn1:
-            if st.button("🔄 뉴스 수집 (20건)", type="primary"):
+            if st.button("🔄 뉴스 수집 (20건)", type="primary", key="news_collect_20"):
                 progress_bar = st.progress(0)
                 status_text = st.empty()
                 try:
@@ -99,7 +99,7 @@ with tab1:
                     st.code(traceback.format_exc())
         
         with col_btn2:
-            if st.button("➕ 추가 수집 (10건)", type="secondary"):
+            if st.button("➕ 추가 수집 (10건)", type="secondary", key="news_add_10"):
                 progress_bar = st.progress(0)
                 status_text = st.empty()
                 try:
@@ -286,7 +286,7 @@ with tab2:
     with col2:
         col_btn1, col_btn2 = st.columns([1, 1])
         with col_btn1:
-            if st.button("🔄 논문 수집 (10건)", type="primary"):
+            if st.button("🔄 논문 수집 (10건)", type="primary", key="paper_collect_10"):
                 progress_bar = st.progress(0)
                 status_text = st.empty()
                 try:
@@ -316,7 +316,7 @@ with tab2:
                     st.code(traceback.format_exc())
         
         with col_btn2:
-            if st.button("➕ 추가 수집 (10건)", type="secondary"):
+            if st.button("➕ 추가 수집 (10건)", type="secondary", key="paper_add_10"):
                 progress_bar = st.progress(0)
                 status_text = st.empty()
                 try:
@@ -572,11 +572,12 @@ with tab3:
     template = st.radio(
         "생성할 콘텐츠 유형",
         ["블로그 포스트", "릴스 대본", "게시글", "논문 아이디어"],
-        horizontal=True
+        horizontal=True,
+        key="content_template_radio"
     )
     
     # 생성 버튼
-    if st.button("✨ 콘텐츠 생성", type="primary", disabled=len(selected_news) + len(selected_papers) == 0):
+    if st.button("✨ 콘텐츠 생성", type="primary", disabled=len(selected_news) + len(selected_papers) == 0, key="content_generate_btn"):
         if len(selected_news) + len(selected_papers) == 0:
             st.warning("콘텐츠를 선택해주세요.")
         else:

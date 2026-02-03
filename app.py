@@ -943,10 +943,10 @@ elif selected_menu == "📈 경제 흐름 파악":
                     st.success(f"✅ 수집 완료: {collected}개 수집, {saved}개 저장")
                 
                 progress_bar.progress(1.0)
-                except Exception as e:
-                    st.error(f"❌ 오류 발생: {e}")
-                    import traceback
-                    st.code(traceback.format_exc())
+            except Exception as e:
+                st.error(f"❌ 오류 발생: {e}")
+                import traceback
+                st.code(traceback.format_exc())
         
         with col_btn2:
             col_report1, col_report2 = st.columns([1, 1])

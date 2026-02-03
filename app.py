@@ -580,34 +580,42 @@ with tab3:
         if len(selected_news) + len(selected_papers) == 0:
             st.warning("콘텐츠를 선택해주세요.")
         else:
-            with st.spinner("AI가 콘텐츠를 생성 중입니다..."):
-                try:
-                    from modules.ai_engine import get_model
-                    import google.generativeai as genai
-                    
-                    # 선택된 콘텐츠 수집
-                    selected_content = []
-                    for news in selected_news:
-                        content = f"뉴스: {news['title']}\n"
-                        if news.get('summary'):
-                            content += f"요약: {news['summary']}\n"
-                        selected_content.append(content)
-                    
-                    for paper in selected_papers:
-                        content = f"논문: {paper['title']}\n"
-                        if paper.get('abstract'):
-                            content += f"초록: {paper['abstract'][:500]}\n"
-                        selected_content.append(content)
-                    
-                    if not selected_content:
-                        st.error("선택된 콘텐츠가 없습니다.")
-                        st.stop()
-                    
-                    content_text = "\n\n".join(selected_content)
-                    
-                    # 템플릿별 프롬프트
-                    prompts = {
-                        "블로그 포스트": f"""다음 콘텐츠를 바탕으로 전문적인 블로그 포스트를 작성해주세요.
+            try:
+                from modules.ai_engine import get_model
+                
+                # 진행도 표시
+                progress_bar = st.progress(0)
+                status_text = st.empty()
+                
+                status_text.text("콘텐츠 준비 중... (10%)")
+                progress_bar.progress(0.1)
+                
+                # 선택된 콘텐츠 수집
+                selected_content = []
+                for news in selected_news:
+                    content = f"뉴스: {news['title']}\n"
+                    if news.get('summary'):
+                        content += f"요약: {news['summary']}\n"
+                    selected_content.append(content)
+                
+                for paper in selected_papers:
+                    content = f"논문: {paper['title']}\n"
+                    if paper.get('abstract'):
+                        content += f"초록: {paper['abstract'][:500]}\n"
+                    selected_content.append(content)
+                
+                if not selected_content:
+                    st.error("선택된 콘텐츠가 없습니다.")
+                    st.stop()
+                
+                content_text = "\n\n".join(selected_content)
+                
+                status_text.text("프롬프트 준비 중... (20%)")
+                progress_bar.progress(0.2)
+                
+                # 템플릿별 프롬프트
+                prompts = {
+                    "블로그 포스트": f"""다음 콘텐츠를 바탕으로 전문적인 블로그 포스트를 작성해주세요.
 구조: 제목, 서론, 본문(3-4개 섹션), 결론
 전문적이고 읽기 쉽게 작성해주세요.
 
@@ -615,7 +623,7 @@ with tab3:
 {content_text[:3000]}
 
 블로그 포스트:""",
-                        "릴스 대본": f"""다음 콘텐츠를 바탕으로 30초 분량의 릴스 대본을 작성해주세요.
+                    "릴스 대본": f"""다음 콘텐츠를 바탕으로 30초 분량의 릴스 대본을 작성해주세요.
 구조: 훅(첫 3초 주목), 본문(핵심 내용), CTA(행동 유도)
 간결하고 임팩트 있게 작성해주세요.
 
@@ -623,7 +631,7 @@ with tab3:
 {content_text[:2000]}
 
 릴스 대본:""",
-                        "게시글": f"""다음 콘텐츠를 바탕으로 SNS용 게시글을 작성해주세요.
+                    "게시글": f"""다음 콘텐츠를 바탕으로 SNS용 게시글을 작성해주세요.
 200자 내외, 해시태그 포함
 친근하고 공유하기 좋게 작성해주세요.
 
@@ -631,7 +639,7 @@ with tab3:
 {content_text[:2000]}
 
 게시글:""",
-                        "논문 아이디어": f"""다음 논문들을 바탕으로 새로운 연구 아이디어를 제안해주세요.
+                    "논문 아이디어": f"""다음 논문들을 바탕으로 새로운 연구 아이디어를 제안해주세요.
 구조: 연구 주제, 연구 질문, 예상 방법론, 참고 논문
 학술적이고 구체적으로 작성해주세요.
 
@@ -639,17 +647,29 @@ with tab3:
 {content_text[:3000]}
 
 논문 아이디어:"""
-                    }
-                    
-                    from modules.ai_engine import get_model
-                    model = get_model()
-                    prompt = prompts.get(template, prompts["블로그 포스트"])
-                    response = model.generate_content(
-                        prompt,
-                        generation_config={"temperature": 0.7, "max_output_tokens": 2000}
-                    )
-                    
-                    generated_content = response.text.strip()
+                }
+                
+                status_text.text("AI 모델 초기화 중... (30%)")
+                progress_bar.progress(0.3)
+                
+                model = get_model()
+                
+                status_text.text("콘텐츠 생성 중... (60%)")
+                progress_bar.progress(0.6)
+                
+                prompt = prompts.get(template, prompts["블로그 포스트"])
+                response = model.generate_content(
+                    prompt,
+                    generation_config={"temperature": 0.7, "max_output_tokens": 2000}
+                )
+                
+                status_text.text("콘텐츠 생성 완료... (90%)")
+                progress_bar.progress(0.9)
+                
+                generated_content = response.text.strip()
+                
+                progress_bar.progress(1.0)
+                status_text.text("완료! (100%)")
                     
                     if generated_content:
                         st.success("✅ 콘텐츠 생성 완료!")

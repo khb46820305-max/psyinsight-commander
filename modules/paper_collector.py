@@ -297,12 +297,14 @@ def collect_and_analyze_papers(keywords: List[str] = None, sources: List[str] = 
     total_work = len(all_papers)
     current_work = 0
     
+    processed_count = 0
     for paper in all_papers:
+        processed_count += 1
+        url = paper.get("url", "")
+        
         # 진행도 업데이트
         if progress_callback:
-            current_work += 1
-            progress_callback(current_work, total_work, "논문 분석 중...")
-        url = paper.get("url", "")
+            progress_callback(processed_count, total_work, "논문 분석 중...")
         
         if check_duplicate_paper(url):
             logger.info(f"중복 논문 스킵: {url}")
@@ -387,7 +389,7 @@ def collect_and_analyze_papers(keywords: List[str] = None, sources: List[str] = 
         if save_paper_to_db(paper_data):
             total_saved += 1
             if progress_callback:
-                progress_callback(current_work, total_work, f"저장 중... ({total_saved}개 저장됨)")
+                progress_callback(processed_count, total_work, f"저장 중... ({total_saved}개 저장됨)")
         
         time.sleep(1)  # Rate limiting
     

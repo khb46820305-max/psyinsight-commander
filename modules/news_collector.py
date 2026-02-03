@@ -221,8 +221,10 @@ def collect_and_analyze_news(keywords: List[str] = None, countries: List[str] = 
     
     # 전체 작업량 계산 (대략적인 추정)
     # 실제로는 수집된 뉴스 개수에 따라 달라지므로 충분히 큰 값으로 설정
-    total_work = len(countries) * len(keywords) * max_per_keyword * 2  # 여유있게 설정
+    estimated_total = len(countries) * len(keywords) * max_per_keyword * 2  # 여유있게 설정
+    total_work = estimated_total
     current_work = 0
+    processed_count = 0  # 실제 처리된 뉴스 개수
     
     for country in countries:
         # 국가별 키워드 매핑 (같은 주제로 양쪽 모두 검색)
@@ -271,11 +273,17 @@ def collect_and_analyze_news(keywords: List[str] = None, countries: List[str] = 
         news_list = fetch_news_from_rss(country_keywords, country, max_per_keyword)
         
         for news in news_list:
-            # 진행도 업데이트
-            if progress_callback:
-                current_work += 1
-                progress_callback(current_work, total_work, f"뉴스 수집 중 ({country})...")
             url = news.get("url", "")
+            processed_count += 1
+            
+            # 진행도 업데이트 (실제 처리된 개수 기반)
+            if progress_callback:
+                # total_work를 동적으로 조정 (실제 수집된 뉴스 개수 기반)
+                if processed_count <= len(news_list):
+                    adjusted_total = max(total_work, processed_count * 2)  # 여유있게 설정
+                else:
+                    adjusted_total = total_work
+                progress_callback(min(processed_count, adjusted_total), adjusted_total, f"뉴스 수집 중 ({country})...")
             
             # 중복 체크
             if check_duplicate(url):
@@ -348,7 +356,8 @@ def collect_and_analyze_news(keywords: List[str] = None, countries: List[str] = 
             if save_article_to_db(article_data):
                 total_saved += 1
                 if progress_callback:
-                    progress_callback(current_work, total_work, f"저장 중... ({total_saved}개 저장됨)")
+                    adjusted_total = max(total_work, processed_count * 2)
+                    progress_callback(min(processed_count, adjusted_total), adjusted_total, f"저장 중... ({total_saved}개 저장됨)")
             
             # 요청 간격 조절
             time.sleep(2)

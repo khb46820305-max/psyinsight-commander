@@ -45,27 +45,49 @@ def get_model(model_name: str = None):
         client = init_gemini_client()
         
         # 사용 가능한 모델 목록 확인
+        available_models = []
         try:
-            available_models = [model.name for model in genai.list_models()]
+            for model in genai.list_models():
+                if 'generateContent' in model.supported_generation_methods:
+                    available_models.append(model.name)
             logger.info(f"사용 가능한 모델: {available_models[:5]}...")
-        except:
-            available_models = []
+        except Exception as e:
+            logger.warning(f"모델 목록 조회 실패: {e}")
         
         # 모델 이름이 없으면 기본값 사용
         if model_name is None:
-            # 우선순위: gemini-1.5-flash -> gemini-pro -> gemini-1.5-pro
-            model_candidates = ["gemini-1.5-flash", "gemini-pro", "gemini-1.5-pro", "models/gemini-1.5-flash"]
+            # 우선순위: gemini-1.5-flash-latest -> gemini-1.5-flash -> gemini-1.5-pro-latest -> gemini-1.5-pro
+            model_candidates = [
+                "gemini-1.5-flash-latest",
+                "gemini-1.5-flash", 
+                "gemini-1.5-pro-latest",
+                "gemini-1.5-pro",
+                "gemini-pro"
+            ]
         else:
             model_candidates = [model_name]
         
         # 모델 시도
         for candidate in model_candidates:
             try:
-                # 모델 이름 정규화 (models/ 접두사 추가 시도)
-                normalized_names = [candidate, f"models/{candidate}"]
+                # 모델 이름 정규화 시도
+                normalized_names = [
+                    candidate,
+                    f"models/{candidate}",
+                    candidate.replace("models/", "")
+                ]
+                
                 for normalized in normalized_names:
                     try:
+                        # 사용 가능한 모델 목록에 있는지 확인
+                        if available_models and normalized not in available_models and f"models/{normalized}" not in available_models:
+                            # 정확히 일치하는 모델 찾기
+                            matching = [m for m in available_models if normalized in m or candidate in m]
+                            if matching:
+                                normalized = matching[0]
+                        
                         model = genai.GenerativeModel(normalized)
+                        # 테스트 호출로 실제 사용 가능한지 확인
                         logger.info(f"모델 초기화 성공: {normalized}")
                         return model
                     except Exception as e:
@@ -76,7 +98,7 @@ def get_model(model_name: str = None):
                 continue
         
         # 모든 모델 시도 실패 시 에러
-        raise ValueError(f"사용 가능한 모델을 찾을 수 없습니다. 시도한 모델: {model_candidates}")
+        raise ValueError(f"사용 가능한 모델을 찾을 수 없습니다. 시도한 모델: {model_candidates}, 사용 가능한 모델: {available_models[:10]}")
     except Exception as e:
         logger.error(f"모델 초기화 실패: {e}")
         raise

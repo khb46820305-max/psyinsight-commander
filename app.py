@@ -900,25 +900,67 @@ elif selected_menu == "📈 경제 흐름 파악":
     with col1:
         st.markdown("거시경제, 산업 분석, 글로벌 시황 정보를 수집하고 분석합니다.")
     with col2:
-        if st.button("🔄 경제 흐름 파악하기", type="primary", key="economy_collect_btn"):
-            progress_bar = st.progress(0)
-            status_text = st.empty()
-            try:
-                from modules.economy_collector import collect_economy_news
-                
-                def update_progress(current, total, message):
-                    progress = current / total if total > 0 else 0
-                    progress_bar.progress(progress)
-                    status_text.text(f"{message} ({current}/{total}) - {int(progress * 100)}%")
-                
-                collected, saved = collect_economy_news(progress_callback=update_progress)
-                progress_bar.progress(1.0)
-                status_text.text(f"✅ 수집 완료: {collected}개 수집, {saved}개 저장")
-                st.success(f"✅ 수집 완료: {collected}개 수집, {saved}개 저장")
-            except Exception as e:
-                st.error(f"❌ 오류 발생: {e}")
-                import traceback
-                st.code(traceback.format_exc())
+        col_btn1, col_btn2 = st.columns([1, 1])
+        with col_btn1:
+            if st.button("🔄 경제 흐름 파악하기", type="primary", key="economy_collect_btn"):
+                progress_bar = st.progress(0)
+                status_text = st.empty()
+                try:
+                    from modules.economy_collector import collect_economy_news
+                    
+                    def update_progress(current, total, message):
+                        progress = current / total if total > 0 else 0
+                        progress_bar.progress(progress)
+                        status_text.text(f"{message} ({current}/{total}) - {int(progress * 100)}%")
+                    
+                    collected, saved = collect_economy_news(progress_callback=update_progress)
+                    progress_bar.progress(1.0)
+                    status_text.text(f"✅ 수집 완료: {collected}개 수집, {saved}개 저장")
+                    st.success(f"✅ 수집 완료: {collected}개 수집, {saved}개 저장")
+                except Exception as e:
+                    st.error(f"❌ 오류 발생: {e}")
+                    import traceback
+                    st.code(traceback.format_exc())
+        
+        with col_btn2:
+            if st.button("📊 종합 보고서 생성", type="secondary", key="economy_report_btn"):
+                try:
+                    from modules.economy_collector import generate_daily_economy_report
+                    from datetime import datetime
+                    
+                    with st.spinner("일일 경제 종합 보고서 생성 중..."):
+                        report = generate_daily_economy_report()
+                        
+                        if report:
+                            st.success("✅ 종합 보고서 생성 완료!")
+                            st.session_state['economy_report'] = report
+                            st.session_state['economy_report_date'] = datetime.now().strftime("%Y-%m-%d")
+                        else:
+                            st.warning("⚠️ 보고서 생성 실패. 먼저 경제 뉴스를 수집해주세요.")
+                except Exception as e:
+                    st.error(f"❌ 오류 발생: {e}")
+                    import traceback
+                    st.code(traceback.format_exc())
+    
+    # 종합 보고서 표시
+    if 'economy_report' in st.session_state and st.session_state.get('economy_report'):
+        st.divider()
+        st.subheader(f"📊 일일 경제 종합 보고서 ({st.session_state.get('economy_report_date', '')})")
+        
+        # 보고서 표시
+        st.markdown("---")
+        st.markdown(st.session_state['economy_report'])
+        st.markdown("---")
+        
+        # 보고서 다운로드 버튼 (선택사항)
+        report_text = st.session_state['economy_report']
+        st.download_button(
+            label="📥 보고서 다운로드",
+            data=report_text,
+            file_name=f"경제종합보고서_{st.session_state.get('economy_report_date', datetime.now().strftime('%Y%m%d'))}.txt",
+            mime="text/plain",
+            key="download_report"
+        )
     
     st.divider()
     

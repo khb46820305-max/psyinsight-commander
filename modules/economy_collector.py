@@ -13,7 +13,7 @@ import json
 import feedparser
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from modules.ai_engine import generate_summary, extract_keywords
+from modules.ai_engine import generate_summary, extract_keywords, get_model
 from modules.database import get_connection
 
 # 로깅 설정

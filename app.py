@@ -56,18 +56,84 @@ with tab1:
         conn = get_connection()
         cursor = conn.cursor()
         
+        # 검색 및 필터 기능
+        col1, col2, col3 = st.columns([2, 1, 1])
+        
+        with col1:
+            search_query = st.text_input("🔍 검색", placeholder="제목, 요약, 키워드로 검색...", key="news_search")
+        
+        with col2:
+            sort_option = st.selectbox("정렬", ["최신순", "오래된순", "평점 높은순", "평점 낮은순"], key="news_sort")
+        
+        with col3:
+            country_filter = st.selectbox("국가", ["전체", "한국", "미국"], key="news_country")
+        
+        # 키워드 필터 (해시태그)
+        cursor.execute("SELECT DISTINCT keywords FROM articles WHERE keywords IS NOT NULL AND keywords != ''")
+        all_keywords = set()
+        for row in cursor.fetchall():
+            try:
+                keywords = json.loads(row[0]) if row[0] else []
+                all_keywords.update(keywords)
+            except:
+                pass
+        
+        if all_keywords:
+            selected_keywords = st.multiselect("🏷️ 키워드 필터", sorted(all_keywords), key="news_keywords")
+        else:
+            selected_keywords = []
+        
+        # SQL 쿼리 구성
+        where_conditions = []
+        params = []
+        
+        # 검색 조건
+        if search_query:
+            where_conditions.append("(title LIKE ? OR content_summary LIKE ? OR keywords LIKE ?)")
+            search_param = f"%{search_query}%"
+            params.extend([search_param, search_param, search_param])
+        
+        # 국가 필터
+        if country_filter != "전체":
+            where_conditions.append("country = ?")
+            params.append("KR" if country_filter == "한국" else "US")
+        
+        # 키워드 필터
+        if selected_keywords:
+            keyword_conditions = []
+            for keyword in selected_keywords:
+                keyword_conditions.append("keywords LIKE ?")
+                params.append(f'%"{keyword}"%')
+            where_conditions.append(f"({' OR '.join(keyword_conditions)})")
+        
+        where_clause = " AND ".join(where_conditions) if where_conditions else "1=1"
+        
+        # 정렬
+        if sort_option == "최신순":
+            order_by = "created_at DESC"
+        elif sort_option == "오래된순":
+            order_by = "created_at ASC"
+        elif sort_option == "평점 높은순":
+            order_by = "validity_score DESC, created_at DESC"
+        else:  # 평점 낮은순
+            order_by = "validity_score ASC, created_at DESC"
+        
         # 페이지네이션
         page_size = 10
-        page = st.number_input("페이지", min_value=1, value=1, step=1)
+        page = st.number_input("페이지", min_value=1, value=1, step=1, key="news_page")
         offset = (page - 1) * page_size
         
-        # 뉴스 조회 (최신순)
-        cursor.execute("""
+        # 뉴스 조회
+        query = f"""
             SELECT id, date, title, url, content_summary, keywords, validity_score, country
             FROM articles
-            ORDER BY created_at DESC
+            WHERE {where_clause}
+            ORDER BY {order_by}
             LIMIT ? OFFSET ?
-        """, (page_size, offset))
+        """
+        params.extend([page_size, offset])
+        
+        cursor.execute(query, params)
         
         articles = cursor.fetchall()
         conn.close()
@@ -145,16 +211,69 @@ with tab2:
         conn = get_connection()
         cursor = conn.cursor()
         
+        # 검색 및 필터 기능
+        col1, col2 = st.columns([2, 1])
+        
+        with col1:
+            search_query = st.text_input("🔍 검색", placeholder="제목, 저자, 키워드로 검색...", key="paper_search")
+        
+        with col2:
+            sort_option = st.selectbox("정렬", ["최신순", "오래된순"], key="paper_sort")
+        
+        # 키워드 필터
+        cursor.execute("SELECT DISTINCT keywords FROM papers WHERE keywords IS NOT NULL AND keywords != ''")
+        all_keywords = set()
+        for row in cursor.fetchall():
+            try:
+                keywords = json.loads(row[0]) if row[0] else []
+                all_keywords.update(keywords)
+            except:
+                pass
+        
+        if all_keywords:
+            selected_keywords = st.multiselect("🏷️ 키워드 필터", sorted(all_keywords), key="paper_keywords")
+        else:
+            selected_keywords = []
+        
+        # SQL 쿼리 구성
+        where_conditions = []
+        params = []
+        
+        # 검색 조건
+        if search_query:
+            where_conditions.append("(title LIKE ? OR authors LIKE ? OR keywords LIKE ?)")
+            search_param = f"%{search_query}%"
+            params.extend([search_param, search_param, search_param])
+        
+        # 키워드 필터
+        if selected_keywords:
+            keyword_conditions = []
+            for keyword in selected_keywords:
+                keyword_conditions.append("keywords LIKE ?")
+                params.append(f'%"{keyword}"%')
+            where_conditions.append(f"({' OR '.join(keyword_conditions)})")
+        
+        where_clause = " AND ".join(where_conditions) if where_conditions else "1=1"
+        
+        # 정렬
+        order_by = "created_at DESC" if sort_option == "최신순" else "created_at ASC"
+        
+        # 페이지네이션
         page_size = 10
         page = st.number_input("페이지", min_value=1, value=1, step=1, key="paper_page")
         offset = (page - 1) * page_size
         
-        cursor.execute("""
+        # 논문 조회
+        query = f"""
             SELECT id, date, title, authors, journal, url, abstract, summary, keywords, category
             FROM papers
-            ORDER BY created_at DESC
+            WHERE {where_clause}
+            ORDER BY {order_by}
             LIMIT ? OFFSET ?
-        """, (page_size, offset))
+        """
+        params.extend([page_size, offset])
+        
+        cursor.execute(query, params)
         
         papers = cursor.fetchall()
         conn.close()

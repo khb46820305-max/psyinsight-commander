@@ -1225,7 +1225,7 @@ elif selected_menu == "🧪 테스트":
                     st.markdown(f"**{title}**")
                     st.markdown(f"📅 {date} | 📖 {journal}")
                     if abstract:
-                        with st.expander("📄 Abstract"):
+                        with st.expander("📄 Abstract", expanded=True):
                             # Abstract에 번역이 포함되어 있는지 확인
                             if "[원문]" in abstract and "[한국어 번역]" in abstract:
                                 # 외국 논문: 원문과 번역 분리 표시
@@ -1233,17 +1233,22 @@ elif selected_menu == "🧪 테스트":
                                 if len(parts) == 2:
                                     original = parts[0].replace("[원문]", "").strip()
                                     translated = parts[1].strip()
-                                    st.markdown("**📄 원본 Abstract (영문):**")
-                                    st.markdown(f"<p style='font-size: 12px; line-height: 1.6;'>{original}</p>", unsafe_allow_html=True)
-                                    st.markdown("---")
+                                    
+                                    # 한국어 번역 먼저 표시 (가독성 향상)
                                     st.markdown("**🇰🇷 한국어 번역:**")
-                                    st.markdown(f"<p style='font-size: 12px; line-height: 1.6;'>{translated}</p>", unsafe_allow_html=True)
+                                    st.markdown(f"<p style='font-size: 13px; line-height: 1.8; color: #333; margin-bottom: 15px;'>{translated}</p>", unsafe_allow_html=True)
+                                    st.markdown("---")
+                                    st.markdown("**📄 원본 Abstract (영문):**")
+                                    st.markdown(f"<p style='font-size: 12px; line-height: 1.6; color: #666;'>{original}</p>", unsafe_allow_html=True)
                                 else:
+                                    st.markdown("**📄 논문 Abstract:**")
                                     st.markdown(f"<p style='font-size: 12px; line-height: 1.6;'>{abstract}</p>", unsafe_allow_html=True)
                             else:
-                                # 한국 논문: 원문만 표시
+                                # 한국 논문 또는 번역 실패: 원문만 표시
                                 st.markdown("**📄 논문 Abstract:**")
                                 st.markdown(f"<p style='font-size: 12px; line-height: 1.6;'>{abstract}</p>", unsafe_allow_html=True)
+                                if journal and ("arxiv" in journal.lower() or "pubmed" in journal.lower()):
+                                    st.info("💡 외국 논문이지만 번역이 아직 생성되지 않았습니다. 잠시 후 다시 확인해주세요.")
                     if url:
                         st.markdown(f"[원문 보기 →]({url})")
                     st.markdown("---")

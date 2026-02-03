@@ -124,6 +124,25 @@ def translate_title(title: str, max_retries: int = 3) -> str:
             time.sleep(2 ** attempt)
 
 
+def generate_summary(text: str, max_retries: int = 3) -> str:
+    """
+    텍스트를 3줄로 요약
+    
+    Args:
+        text: 요약할 텍스트
+        max_retries: 최대 재시도 횟수
+    
+    Returns:
+        3줄 요약 문자열
+    """
+    prompt = f"""다음 뉴스 기사를 3줄로 요약해주세요. 각 줄은 핵심 내용을 간결하게 담아야 합니다.
+
+기사 내용:
+{text}
+
+요약:"""
+
+
 def generate_news_summary_korean(text: str, max_retries: int = 3) -> str:
     """
     외국 뉴스를 한국어로 100자 수준으로 요약
@@ -166,26 +185,7 @@ def generate_news_summary_korean(text: str, max_retries: int = 3) -> str:
             time.sleep(2 ** attempt)
 
 
-def generate_summary(text: str, max_retries: int = 3) -> str:
-    """
-    텍스트를 3줄로 요약
-    
-    Args:
-        text: 요약할 텍스트
-        max_retries: 최대 재시도 횟수
-    
-    Returns:
-        3줄 요약 문자열
-    """
-    prompt = f"""다음 뉴스 기사를 3줄로 요약해주세요. 각 줄은 핵심 내용을 간결하게 담아야 합니다.
-
-기사 내용:
-{text}
-
-요약:"""
-
-
-def generate_news_summary_korean(text: str, max_retries: int = 3) -> str:
+def translate_abstract(abstract: str, max_retries: int = 3) -> str:
     """
     외국 뉴스를 한국어로 100자 수준으로 요약
     

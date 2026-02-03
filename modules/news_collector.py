@@ -243,13 +243,28 @@ def process_single_news(news: Dict, country: str) -> Optional[Dict]:
         
         if country == "US":  # 외국 뉴스
             # 제목 번역
-            title_translated = translate_title(title_original)
+            try:
+                title_translated = translate_title(title_original)
+                logger.info(f"제목 번역 완료: {title_translated[:50]}")
+            except Exception as e:
+                logger.error(f"제목 번역 실패: {e}")
+                title_translated = title_original
+            
             # 100자 수준 한국어 요약
-            summary = generate_news_summary_korean(full_text[:2000])
-            if not summary or len(summary) > 150:
-                summary = summary[:100] + "..." if summary and len(summary) > 100 else (title_translated[:100] + "...")
+            try:
+                summary = generate_news_summary_korean(full_text[:2000])
+                if not summary or len(summary) > 150:
+                    summary = summary[:100] + "..." if summary and len(summary) > 100 else (title_translated[:100] + "...")
+                logger.info(f"요약 생성 완료: {summary[:50]}")
+            except Exception as e:
+                logger.error(f"요약 생성 실패: {e}")
+                summary = title_translated[:100] + "..." if len(title_translated) > 100 else title_translated
+            
             # 제목에 번역 병기
-            title_display = f"{title_original} ({title_translated})"
+            if title_translated != title_original:
+                title_display = f"{title_original} ({title_translated})"
+            else:
+                title_display = title_original
         else:  # 국내 뉴스는 요약 없음
             title_display = title_original
             summary = ""

@@ -266,16 +266,21 @@ def process_single_paper(paper: Dict) -> Optional[Dict]:
         return None
     
     # 논문이 외국 논문인지 확인 (arXiv, PubMed, 영문 저널명 등)
-    is_foreign = journal.lower() in ["arxiv", "pubmed"] or any(char.isascii() and char.isalpha() for char in abstract[:100])
+    is_foreign = journal.lower() in ["arxiv", "pubmed"] or (abstract and any(char.isascii() and char.isalpha() for char in abstract[:100]))
     
     # AI 분석
     try:
         abstract_translated = ""
         summary = {}  # 한국 논문은 해석 요약 없음
         
-        if is_foreign:
+        if is_foreign and abstract:
             # 외국 논문: Abstract 한글 번역
-            abstract_translated = translate_abstract(abstract[:3000])
+            try:
+                abstract_translated = translate_abstract(abstract[:3000])
+                logger.info(f"Abstract 번역 완료: {len(abstract_translated)}자")
+            except Exception as e:
+                logger.error(f"Abstract 번역 실패: {e}")
+                abstract_translated = abstract  # 번역 실패 시 원문 사용
             # 해석 요약은 제거하고 번역된 Abstract만 사용
             summary = {}  # 빈 딕셔너리로 저장
         else:
@@ -291,13 +296,15 @@ def process_single_paper(paper: Dict) -> Optional[Dict]:
             
     except Exception as e:
         logger.error(f"AI 분석 실패: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
         abstract_translated = abstract
         summary = {}
         keywords_list = extract_keywords(title[:500], max_keywords=5) if title else []
     
     # 데이터베이스에 저장
     # Abstract에 번역 병기 (외국 논문인 경우)
-    if is_foreign and abstract_translated != abstract:
+    if is_foreign and abstract_translated and abstract_translated != abstract and len(abstract_translated) > 50:
         abstract_display = f"[원문]\n{abstract[:2000]}\n\n[한국어 번역]\n{abstract_translated[:2000]}"
     else:
         abstract_display = abstract

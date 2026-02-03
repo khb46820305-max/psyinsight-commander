@@ -219,6 +219,11 @@ def collect_and_analyze_news(keywords: List[str] = None, countries: List[str] = 
     total_collected = 0
     total_saved = 0
     
+    # 전체 작업량 계산 (대략적인 추정)
+    # 실제로는 수집된 뉴스 개수에 따라 달라지므로 충분히 큰 값으로 설정
+    total_work = len(countries) * len(keywords) * max_per_keyword * 2  # 여유있게 설정
+    current_work = 0
+    
     for country in countries:
         # 국가별 키워드 매핑 (같은 주제로 양쪽 모두 검색)
         if country == "KR":

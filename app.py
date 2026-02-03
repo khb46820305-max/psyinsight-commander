@@ -61,10 +61,12 @@ with st.sidebar:
     st.header("📋 메뉴")
     
     menu_options = [
+        "🏠 대시보드",
         "📰 트랜드 레이더",
         "📚 아카이브",
         "✨ 팩토리",
         "📈 경제 흐름 파악",
+        "💾 내 콘텐츠",
         "🗑️ 수집 내용 관리",
         "🧪 테스트",
         "⚙️ 설정",
@@ -945,7 +947,67 @@ elif selected_menu == "✨ 팩토리":
         st.session_state.scroll_to_top_tab3 = False
     st.markdown("</div>", unsafe_allow_html=True)
 
-# 4. 수집 내용 관리
+# 4. 내 콘텐츠
+elif selected_menu == "💾 내 콘텐츠":
+    st.header("💾 내 콘텐츠")
+    st.markdown("생성된 콘텐츠와 북마크를 관리합니다.")
+    
+    tab1, tab2 = st.tabs(["생성된 콘텐츠", "북마크"])
+    
+    with tab1:
+        st.subheader("생성된 콘텐츠")
+        try:
+            from modules.database import get_connection
+            from datetime import datetime
+            
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT id, content_type, title, content, created_at
+                FROM generated_content
+                ORDER BY created_at DESC
+            """)
+            
+            contents = cursor.fetchall()
+            conn.close()
+            
+            if contents:
+                for content_id, content_type, title, content, created_at in contents:
+                    with st.expander(f"📝 {title} ({content_type}) - {created_at[:10]}"):
+                        st.markdown(f"**생성일:** {created_at}")
+                        st.text_area("내용", content, height=200, key=f"content_{content_id}")
+                        
+                        col1, col2 = st.columns([1, 1])
+                        with col1:
+                            st.download_button(
+                                "📥 다운로드",
+                                content,
+                                file_name=f"{title}_{created_at[:10]}.txt",
+                                mime="text/plain",
+                                key=f"download_{content_id}"
+                            )
+                        with col2:
+                            if st.button("🗑️ 삭제", key=f"delete_{content_id}"):
+                                try:
+                                    conn = get_connection()
+                                    cursor = conn.cursor()
+                                    cursor.execute("DELETE FROM generated_content WHERE id = ?", (content_id,))
+                                    conn.commit()
+                                    conn.close()
+                                    st.success("✅ 삭제되었습니다!")
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error(f"❌ 삭제 실패: {e}")
+            else:
+                st.info("📭 저장된 콘텐츠가 없습니다.")
+        except Exception as e:
+            st.error(f"❌ 콘텐츠 로드 실패: {e}")
+    
+    with tab2:
+        st.subheader("북마크")
+        st.info("📌 북마크 기능은 곧 추가될 예정입니다.")
+
+# 5. 수집 내용 관리
 elif selected_menu == "🗑️ 수집 내용 관리":
     st.header("🗑️ 수집 내용 관리")
     st.markdown("수집된 뉴스와 논문을 선택하여 삭제할 수 있습니다.")

@@ -11,6 +11,7 @@ from typing import List, Dict, Optional
 import time
 import json
 import feedparser
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from modules.ai_engine import generate_summary, extract_keywords
 from modules.database import get_connection
@@ -340,14 +341,69 @@ def save_economy_news_to_db(news_data: Dict) -> bool:
         return False
 
 
+def process_single_economy_item(item: Dict) -> Optional[Dict]:
+    """
+    단일 경제 뉴스 처리 함수 (병렬 처리용)
+    
+    Args:
+        item: 경제 뉴스 딕셔너리
+    
+    Returns:
+        처리된 뉴스 데이터 (실패 시 None)
+    """
+    url = item.get("url", "")
+    
+    # 중복 체크 (먼저 수행하여 불필요한 처리 방지)
+    if check_duplicate(url):
+        logger.info(f"중복 항목 스킵: {url}")
+        return None
+    
+    # 본문 스크래핑
+    full_text = scrape_content(url)
+    if not full_text:
+        full_text = item.get("title", "")
+    
+    # AI 분석
+    try:
+        # 요약 생성 (3줄)
+        summary = generate_summary(full_text[:2000])
+        if not summary or len(summary) > 200:
+            summary = summary[:200] + "..." if summary and len(summary) > 200 else (item.get('title', '')[:100] + "...")
+        
+        # 키워드 추출
+        keywords_list = extract_keywords(full_text[:2000], max_keywords=5)
+        
+    except Exception as e:
+        logger.error(f"AI 분석 실패: {e}")
+        summary = item.get('title', '')[:100] + "..."
+        keywords_list = []
+    
+    # 데이터베이스에 저장
+    news_data = {
+        "date": datetime.now().strftime("%Y-%m-%d"),
+        "category": item.get("category", "경제"),
+        "title": item.get("title", ""),
+        "url": url,
+        "content_summary": summary,
+        "full_text": full_text[:5000],
+        "keywords": keywords_list,
+        "source": item.get("source", "")
+    }
+    
+    if save_economy_news_to_db(news_data):
+        return news_data
+    
+    return None
+
+
 def collect_economy_news(progress_callback=None):
     """
-    경제 흐름 정보 수집 메인 함수
+    경제 흐름 정보 수집 메인 함수 (병렬 처리 최적화)
     
     Args:
         progress_callback: 진행도 콜백 함수
     """
-    logger.info("=== 경제 흐름 정보 수집 시작 ===")
+    logger.info("=== 경제 흐름 정보 수집 시작 (병렬 처리) ===")
     
     total_collected = 0
     total_saved = 0
@@ -361,11 +417,11 @@ def collect_economy_news(progress_callback=None):
     
     bok_reports = fetch_bok_reports(max_results=5)
     all_items.extend(bok_reports)
-    time.sleep(1)
+    time.sleep(0.3)
     
     kdi_reports = fetch_kdi_reports(max_results=5)
     all_items.extend(kdi_reports)
-    time.sleep(1)
+    time.sleep(0.3)
     
     # 2. 산업 및 기업 분석
     logger.info("산업 분석 정보 수집 중...")
@@ -374,11 +430,11 @@ def collect_economy_news(progress_callback=None):
     
     hankyung_reports = fetch_hankyung_consensus(max_results=10)
     all_items.extend(hankyung_reports)
-    time.sleep(1)
+    time.sleep(0.3)
     
     naver_reports = fetch_naver_finance(max_results=10)
     all_items.extend(naver_reports)
-    time.sleep(1)
+    time.sleep(0.3)
     
     # 3. 글로벌 시황 및 뉴스
     logger.info("글로벌 시황 정보 수집 중...")
@@ -387,75 +443,50 @@ def collect_economy_news(progress_callback=None):
     
     investing_news = fetch_investing_news(max_results=10)
     all_items.extend(investing_news)
-    time.sleep(1)
+    time.sleep(0.3)
     
     kcif_news = fetch_kcif_news(max_results=10)
     all_items.extend(kcif_news)
-    time.sleep(1)
+    time.sleep(0.3)
     
     # 전체 작업량 계산
     total_work = len(all_items)
     processed_count = 0
     
-    # 각 항목 분석 및 저장
-    logger.info(f"총 {len(all_items)}개 항목 분석 시작")
+    logger.info(f"총 {total_work}개 항목 수집 완료. 병렬 처리 시작...")
     if progress_callback:
-        progress_callback(4, 6, f"항목 분석 중... (0/{len(all_items)})")
+        progress_callback(4, 6, f"항목 분석 준비 중...")
     
-    for item in all_items:
-        processed_count += 1
-        url = item.get("url", "")
-        
-        if progress_callback:
-            progress_callback(4 + (processed_count / len(all_items) * 2), 6, 
-                           f"항목 분석 중... ({processed_count}/{len(all_items)})")
-        
-        # 중복 체크
-        if check_duplicate(url):
-            logger.info(f"중복 항목 스킵: {url}")
-            continue
-        
-        total_collected += 1
-        
-        # 본문 스크래핑
-        full_text = scrape_content(url)
-        if not full_text:
-            full_text = item.get("title", "")
-        
-        # AI 분석
-        try:
-            # 요약 생성 (3줄)
-            summary = generate_summary(full_text[:2000])
-            if not summary or len(summary) > 200:
-                summary = summary[:200] + "..." if summary and len(summary) > 200 else (item.get('title', '')[:100] + "...")
-            
-            # 키워드 추출
-            keywords_list = extract_keywords(full_text[:2000], max_keywords=5)
-            
-        except Exception as e:
-            logger.error(f"AI 분석 실패: {e}")
-            summary = item.get('title', '')[:100] + "..."
-            keywords_list = []
-        
-        # 데이터베이스에 저장
-        news_data = {
-            "date": datetime.now().strftime("%Y-%m-%d"),
-            "category": item.get("category", "경제"),
-            "title": item.get("title", ""),
-            "url": url,
-            "content_summary": summary,
-            "full_text": full_text[:5000],
-            "keywords": keywords_list,
-            "source": item.get("source", "")
+    # 병렬 처리 (최대 5개 스레드 동시 실행)
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        # 모든 항목에 대해 병렬 처리 시작
+        future_to_item = {
+            executor.submit(process_single_economy_item, item): item 
+            for item in all_items
         }
         
-        if save_economy_news_to_db(news_data):
-            total_saved += 1
-            if progress_callback:
-                progress_callback(4 + (processed_count / len(all_items) * 2), 6, 
-                               f"저장 중... ({total_saved}개 저장됨)")
-        
-        time.sleep(1)  # Rate limiting
+        # 완료된 작업부터 처리
+        for future in as_completed(future_to_item):
+            processed_count += 1
+            item = future_to_item[future]
+            
+            try:
+                result = future.result()
+                if result:
+                    total_collected += 1
+                    total_saved += 1
+                    
+                    # 진행도 업데이트
+                    if progress_callback:
+                        progress = 4 + (processed_count / total_work * 2) if total_work > 0 else 4
+                        progress_callback(min(progress, 6), 6, 
+                                        f"처리 중... ({processed_count}/{total_work}) - {total_saved}개 저장됨")
+            except Exception as e:
+                logger.error(f"경제 뉴스 처리 실패: {item.get('title', '')[:50]} - {e}")
+                if progress_callback:
+                    progress = 4 + (processed_count / total_work * 2) if total_work > 0 else 4
+                    progress_callback(min(progress, 6), 6, 
+                                    f"처리 중... ({processed_count}/{total_work})")
     
     logger.info(f"=== 경제 흐름 정보 수집 완료: {total_collected}개 수집, {total_saved}개 저장 ===")
     return total_collected, total_saved

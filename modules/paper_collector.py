@@ -333,7 +333,6 @@ def collect_and_analyze_papers(keywords: List[str] = None, sources: List[str] = 
                     except Exception as retry_error:
                         logger.warning(f"Abstract 해석 재시도 {retry + 1}/{max_retries}: {retry_error}")
                         if retry < max_retries - 1:
-                            import time
                             time.sleep(2 ** retry)
                 
                 # Summary가 비어있거나 실패한 경우

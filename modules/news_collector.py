@@ -11,6 +11,7 @@ from datetime import datetime
 from typing import List, Dict, Optional
 import time
 import json
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from modules.ai_engine import generate_summary, evaluate_article, extract_keywords
 from modules.database import get_connection
@@ -57,7 +58,9 @@ def fetch_news_from_rss(keywords: List[str], country: str = "KR", max_results: i
             # RSS Feed 파싱
             feed = feedparser.parse(rss_url)
             
-            for entry in feed.entries[:max_results]:
+            # 정확히 max_results 개수만 가져오기
+            entries = feed.entries[:max_results]
+            for entry in entries:
                 news_item = {
                     "title": entry.get("title", ""),
                     "url": entry.get("link", ""),
@@ -68,8 +71,8 @@ def fetch_news_from_rss(keywords: List[str], country: str = "KR", max_results: i
                 }
                 all_news.append(news_item)
             
-            # 요청 간격 조절 (Rate limiting)
-            time.sleep(1)
+            # 요청 간격 조절 (Rate limiting) - 병렬 처리로 인해 감소
+            time.sleep(0.3)
             
         except Exception as e:
             logger.error(f"RSS Feed 파싱 실패 ({keyword}): {e}")
@@ -123,7 +126,7 @@ def scrape_article_content(url: str, max_retries: int = 2) -> Optional[str]:
         except requests.exceptions.RequestException as e:
             logger.warning(f"기사 스크래핑 실패 (시도 {attempt + 1}/{max_retries}): {e}")
             if attempt < max_retries - 1:
-                time.sleep(2)
+                time.sleep(1)
             else:
                 return None
         except Exception as e:
@@ -199,9 +202,88 @@ def save_article_to_db(article_data: Dict) -> bool:
         return False
 
 
+def process_single_news(news: Dict, country: str) -> Optional[Dict]:
+    """
+    단일 뉴스 처리 함수 (병렬 처리용)
+    
+    Args:
+        news: 뉴스 딕셔너리
+        country: 국가 코드
+    
+    Returns:
+        처리된 기사 데이터 (실패 시 None)
+    """
+    url = news.get("url", "")
+    
+    # 중복 체크 (먼저 수행하여 불필요한 처리 방지)
+    if check_duplicate(url):
+        logger.info(f"중복 기사 스킵: {url}")
+        return None
+    
+    # 제목 기반 관련성 필터링 (스크래핑 전에 먼저 체크)
+    title_lower = news.get("title", "").lower()
+    relevant_keywords = ["심리", "정신", "마음", "우울", "불안", "트라우마", "상담", "치료", "psychology", "mental", "counseling", "therapy", "depression", "anxiety", "trauma"]
+    is_relevant = any(kw in title_lower for kw in relevant_keywords)
+    
+    if not is_relevant:
+        logger.info(f"관련 없는 뉴스 스킵: {news.get('title', '')[:50]}")
+        return None
+    
+    # 기사 본문 스크래핑
+    full_text = scrape_article_content(url)
+    if not full_text:
+        logger.warning(f"본문 추출 실패, 제목만 저장: {url}")
+        full_text = news.get("title", "")
+    
+    # AI 분석
+    try:
+        if country == "US":  # 외국 뉴스만 요약
+            summary = generate_summary(full_text[:2000])
+            if not summary or summary == "요약 생성에 실패했습니다." or len(summary) > 100:
+                summary = summary[:50] + "..." if summary and len(summary) > 50 else (news.get('title', '')[:50] + "...")
+            else:
+                summary = summary[:50] + "..." if len(summary) > 50 else summary
+        else:  # 국내 뉴스는 요약 없음
+            summary = ""
+        
+        # 전문성 평가
+        evaluation = evaluate_article(full_text[:2000])
+        validity_score = evaluation.get("score", 3)
+        
+        # 키워드 추출
+        keywords_list = extract_keywords(full_text[:2000], max_keywords=5)
+        
+    except Exception as e:
+        logger.error(f"AI 분석 실패: {e}")
+        if country == "US":
+            summary = news.get('title', '')[:50] + "..." if news.get('title') else ""
+        else:
+            summary = ""
+        validity_score = 3
+        keywords_list = []
+    
+    # 데이터베이스에 저장
+    article_data = {
+        "date": datetime.now().strftime("%Y-%m-%d"),
+        "category": news.get("keyword", "psychology"),
+        "title": news.get("title", ""),
+        "url": url,
+        "content_summary": summary,
+        "full_text": full_text[:5000],
+        "keywords": keywords_list,
+        "validity_score": validity_score,
+        "country": country
+    }
+    
+    if save_article_to_db(article_data):
+        return article_data
+    
+    return None
+
+
 def collect_and_analyze_news(keywords: List[str] = None, countries: List[str] = None, max_per_keyword: int = 10, progress_callback=None):
     """
-    뉴스 수집 및 AI 분석을 수행하는 메인 함수
+    뉴스 수집 및 AI 분석을 수행하는 메인 함수 (병렬 처리 최적화)
     
     Args:
         keywords: 검색 키워드 리스트 (기본값: 심리 관련 키워드)
@@ -214,17 +296,12 @@ def collect_and_analyze_news(keywords: List[str] = None, countries: List[str] = 
     if countries is None:
         countries = ["KR", "US"]
     
-    logger.info("=== 뉴스 수집 및 분석 시작 ===")
+    logger.info("=== 뉴스 수집 및 분석 시작 (병렬 처리) ===")
     
     total_collected = 0
     total_saved = 0
     
-    # 전체 작업량 계산 (대략적인 추정)
-    # 실제로는 수집된 뉴스 개수에 따라 달라지므로 충분히 큰 값으로 설정
-    estimated_total = len(countries) * len(keywords) * max_per_keyword * 2  # 여유있게 설정
-    total_work = estimated_total
-    current_work = 0
-    processed_count = 0  # 실제 처리된 뉴스 개수
+    all_news_list = []  # 모든 수집된 뉴스
     
     for country in countries:
         # 국가별 키워드 매핑 (같은 주제로 양쪽 모두 검색)
@@ -271,96 +348,45 @@ def collect_and_analyze_news(keywords: List[str] = None, countries: List[str] = 
         
         # RSS Feed에서 뉴스 수집
         news_list = fetch_news_from_rss(country_keywords, country, max_per_keyword)
-        
+        # 국가 정보 추가
         for news in news_list:
-            url = news.get("url", "")
+            news["country"] = country
+        all_news_list.extend(news_list)
+    
+    # 전체 작업량 계산
+    total_work = len(all_news_list)
+    processed_count = 0
+    
+    logger.info(f"총 {total_work}개 뉴스 수집 완료. 병렬 처리 시작...")
+    
+    # 병렬 처리 (최대 5개 스레드 동시 실행)
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        # 모든 뉴스에 대해 병렬 처리 시작
+        future_to_news = {
+            executor.submit(process_single_news, news, news.get("country", "KR")): news 
+            for news in all_news_list
+        }
+        
+        # 완료된 작업부터 처리
+        for future in as_completed(future_to_news):
             processed_count += 1
+            news = future_to_news[future]
             
-            # 진행도 업데이트 (실제 처리된 개수 기반)
-            if progress_callback:
-                # total_work를 동적으로 조정 (실제 수집된 뉴스 개수 기반)
-                if processed_count <= len(news_list):
-                    adjusted_total = max(total_work, processed_count * 2)  # 여유있게 설정
-                else:
-                    adjusted_total = total_work
-                progress_callback(min(processed_count, adjusted_total), adjusted_total, f"뉴스 수집 중 ({country})...")
-            
-            # 중복 체크
-            if check_duplicate(url):
-                logger.info(f"중복 기사 스킵: {url}")
-                continue
-            
-            total_collected += 1
-            
-            # 기사 본문 스크래핑
-            full_text = scrape_article_content(url)
-            if not full_text:
-                logger.warning(f"본문 추출 실패, 제목만 저장: {url}")
-                full_text = news.get("title", "")
-            
-            # 제목 기반 관련성 필터링 (심리/정신건강 관련 키워드 체크)
-            title_lower = news.get("title", "").lower()
-            relevant_keywords = ["심리", "정신", "마음", "우울", "불안", "트라우마", "상담", "치료", "psychology", "mental", "counseling", "therapy", "depression", "anxiety", "trauma"]
-            is_relevant = any(kw in title_lower for kw in relevant_keywords)
-            
-            # 관련 없는 뉴스는 스킵 (제목에 관련 키워드가 없으면)
-            if not is_relevant:
-                logger.info(f"관련 없는 뉴스 스킵: {news.get('title', '')[:50]}")
-                continue
-            
-            # AI 분석
-            # 외국 뉴스만 요약 생성, 국내 뉴스는 헤드라인만 사용
             try:
-                if country == "US":  # 외국 뉴스만 요약
-                    # 요약 생성 (50자 내외)
-                    summary = generate_summary(full_text[:2000])  # 최대 2000자만 전달
-                    if not summary or summary == "요약 생성에 실패했습니다." or len(summary) > 100:
-                        # 요약이 너무 길면 50자로 제한
-                        summary = summary[:50] + "..." if summary and len(summary) > 50 else (news.get('title', '')[:50] + "...")
-                    else:
-                        # 50자 내외로 제한
-                        summary = summary[:50] + "..." if len(summary) > 50 else summary
-                else:  # 국내 뉴스는 요약 없음
-                    summary = ""  # 헤드라인이 곧 내용이므로 요약 없음
-                
-                # 전문성 평가
-                evaluation = evaluate_article(full_text[:2000])
-                validity_score = evaluation.get("score", 3)
-                
-                # 키워드 추출
-                keywords_list = extract_keywords(full_text[:2000], max_keywords=5)
-                
+                result = future.result()
+                if result:
+                    total_collected += 1
+                    total_saved += 1
+                    
+                    # 진행도 업데이트
+                    if progress_callback:
+                        progress_callback(processed_count, total_work, 
+                                        f"처리 중... ({processed_count}/{total_work}) - {total_saved}개 저장됨")
             except Exception as e:
-                logger.error(f"AI 분석 실패: {e}")
-                # 기본값 설정
-                if country == "US":
-                    summary = news.get('title', '')[:50] + "..." if news.get('title') else ""
-                else:
-                    summary = ""  # 국내 뉴스는 요약 없음
-                validity_score = 3
-                keywords_list = []
-            
-            # 데이터베이스에 저장
-            article_data = {
-                "date": datetime.now().strftime("%Y-%m-%d"),
-                "category": news.get("keyword", "psychology"),
-                "title": news.get("title", ""),
-                "url": url,
-                "content_summary": summary,
-                "full_text": full_text[:5000],  # 최대 5000자
-                "keywords": keywords_list,
-                "validity_score": validity_score,
-                "country": country
-            }
-            
-            if save_article_to_db(article_data):
-                total_saved += 1
+                logger.error(f"뉴스 처리 실패: {news.get('title', '')[:50]} - {e}")
                 if progress_callback:
-                    adjusted_total = max(total_work, processed_count * 2)
-                    progress_callback(min(processed_count, adjusted_total), adjusted_total, f"저장 중... ({total_saved}개 저장됨)")
-            
-            # 요청 간격 조절
-            time.sleep(2)
+                    progress_callback(processed_count, total_work, 
+                                    f"처리 중... ({processed_count}/{total_work})")
     
     logger.info(f"=== 뉴스 수집 완료: {total_collected}개 수집, {total_saved}개 저장 ===")
     return total_collected, total_saved

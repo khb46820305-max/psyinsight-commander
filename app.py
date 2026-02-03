@@ -13,18 +13,36 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 맨 위로 스크롤 버튼 JavaScript
+# 맨 위로 스크롤 버튼 JavaScript 및 CSS
 scroll_to_top_js = """
 <script>
 function scrollToTop() {
+    // 여러 방법 시도
     window.scrollTo({top: 0, behavior: 'smooth'});
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+    
+    // Streamlit의 메인 컨테이너 스크롤
+    const mainContainer = document.querySelector('.main');
+    if (mainContainer) {
+        mainContainer.scrollTop = 0;
+    }
+    
+    // 모든 스크롤 가능한 요소 찾아서 스크롤
+    const scrollableElements = document.querySelectorAll('*');
+    scrollableElements.forEach(el => {
+        if (el.scrollTop > 0) {
+            el.scrollTop = 0;
+        }
+    });
 }
 </script>
 <style>
 .scroll-to-top-btn {
     position: fixed;
     bottom: 20px;
-    right: 20px;
+    left: 50%;
+    transform: translateX(-50%);
     background-color: #1f77b4;
     color: white;
     border: none;
@@ -38,6 +56,7 @@ function scrollToTop() {
     display: flex;
     align-items: center;
     justify-content: center;
+    transition: background-color 0.3s;
 }
 .scroll-to-top-btn:hover {
     background-color: #0d5a8a;
@@ -218,9 +237,20 @@ with tab1:
     
     # 맨 위로 버튼
     st.markdown("""
-    <div style="text-align: center; margin: 20px 0;">
-        <button onclick="scrollToTop()" class="scroll-to-top-btn" title="맨 위로">↑</button>
+    <div style="text-align: center; margin: 30px 0; padding: 20px;">
+        <button onclick="scrollToTop()" class="scroll-to-top-btn" title="맨 위로" style="position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background-color: #1f77b4; color: white; border: none; border-radius: 50%; width: 50px; height: 50px; font-size: 20px; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.3); z-index: 1000;">↑</button>
     </div>
+    <script>
+    function scrollToTop() {
+        window.scrollTo({top: 0, behavior: 'smooth'});
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
+        const mainContainer = document.querySelector('.main');
+        if (mainContainer) mainContainer.scrollTop = 0;
+        const stApp = document.querySelector('[data-testid="stApp"]');
+        if (stApp) stApp.scrollTop = 0;
+    }
+    </script>
     """, unsafe_allow_html=True)
 
 # Tab 2: 아카데믹 아카이브
@@ -555,9 +585,20 @@ with tab3:
     
     # 맨 위로 버튼
     st.markdown("""
-    <div style="text-align: center; margin: 20px 0;">
-        <button onclick="scrollToTop()" class="scroll-to-top-btn" title="맨 위로">↑</button>
+    <div style="text-align: center; margin: 30px 0; padding: 20px;">
+        <button onclick="scrollToTop()" class="scroll-to-top-btn" title="맨 위로" style="position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background-color: #1f77b4; color: white; border: none; border-radius: 50%; width: 50px; height: 50px; font-size: 20px; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.3); z-index: 1000;">↑</button>
     </div>
+    <script>
+    function scrollToTop() {
+        window.scrollTo({top: 0, behavior: 'smooth'});
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
+        const mainContainer = document.querySelector('.main');
+        if (mainContainer) mainContainer.scrollTop = 0;
+        const stApp = document.querySelector('[data-testid="stApp"]');
+        if (stApp) stApp.scrollTop = 0;
+    }
+    </script>
     """, unsafe_allow_html=True)
 
 # Tab 4: 수집 내용 관리
@@ -684,9 +725,20 @@ with tab4:
     
     # 맨 위로 버튼
     st.markdown("""
-    <div style="text-align: center; margin: 20px 0;">
-        <button onclick="scrollToTop()" class="scroll-to-top-btn" title="맨 위로">↑</button>
+    <div style="text-align: center; margin: 30px 0; padding: 20px;">
+        <button onclick="scrollToTop()" class="scroll-to-top-btn" title="맨 위로" style="position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background-color: #1f77b4; color: white; border: none; border-radius: 50%; width: 50px; height: 50px; font-size: 20px; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.3); z-index: 1000;">↑</button>
     </div>
+    <script>
+    function scrollToTop() {
+        window.scrollTo({top: 0, behavior: 'smooth'});
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
+        const mainContainer = document.querySelector('.main');
+        if (mainContainer) mainContainer.scrollTop = 0;
+        const stApp = document.querySelector('[data-testid="stApp"]');
+        if (stApp) stApp.scrollTop = 0;
+    }
+    </script>
     """, unsafe_allow_html=True)
     
     st.divider()

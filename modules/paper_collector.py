@@ -274,10 +274,24 @@ def collect_and_analyze_papers(keywords: List[str] = None, sources: List[str] = 
         pubmed_papers = fetch_papers_from_pubmed(keywords, max_per_keyword)
         all_papers.extend(pubmed_papers)
     
-    # 저명 학술지 필터링
+    # 저명 학술지 필터링 및 우선순위 정렬
     logger.info(f"저명 학술지 필터링 전: {len(all_papers)}개 논문")
-    all_papers = filter_papers_by_journal(all_papers)
-    logger.info(f"저명 학술지 필터링 후: {len(all_papers)}개 논문")
+    
+    # 저명 학술지와 일반 학술지 분리
+    reputable_papers = []
+    other_papers = []
+    
+    for paper in all_papers:
+        journal = paper.get("journal", "")
+        if is_reputable_journal(journal):
+            reputable_papers.append(paper)
+        else:
+            other_papers.append(paper)
+    
+    # 저명 학술지를 먼저, 그 다음 일반 학술지
+    all_papers = reputable_papers + other_papers
+    
+    logger.info(f"저명 학술지: {len(reputable_papers)}개, 일반 학술지: {len(other_papers)}개")
     
     for paper in all_papers:
         url = paper.get("url", "")

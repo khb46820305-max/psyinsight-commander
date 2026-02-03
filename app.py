@@ -300,40 +300,61 @@ with tab2:
                     keywords = []
                 
                 with st.container():
-                    st.markdown(f"<h5 style='font-size: 14px; font-weight: bold; margin-bottom: 5px;'>{title}</h5>", unsafe_allow_html=True)
+                    # 논문 제목
+                    st.markdown(f"<h5 style='font-size: 14px; font-weight: bold; margin-bottom: 8px;'>{title}</h5>", unsafe_allow_html=True)
+                    
+                    # 메타 정보
                     st.markdown(f"<p style='font-size: 11px; color: #666; margin-bottom: 5px;'>📅 {date} | 📖 {journal} | 🏷️ {category}</p>", unsafe_allow_html=True)
                     
+                    # 핵심 키워드 해시태그로 표시
+                    if keywords:
+                        keyword_tags_html = " ".join([f"<span style='background-color: #e0e0e0; padding: 2px 8px; border-radius: 12px; font-size: 10px; margin-right: 5px; display: inline-block;'>#{k}</span>" for k in keywords[:5]])
+                        st.markdown(f"<div style='margin-bottom: 8px;'>{keyword_tags_html}</div>", unsafe_allow_html=True)
+                    
+                    # 논문 Abstract 펼쳐보기 (제목 아래에 펼쳐지게)
+                    if abstract:
+                        with st.expander("📄 논문 Abstract 펼쳐보기", expanded=False):
+                            # 외국 논문인 경우 해석된 요약도 표시
+                            if summary and summary.get("purpose"):
+                                st.markdown("**🔍 AI 해석 요약:**")
+                                if summary.get("purpose"):
+                                    st.markdown(f"<p style='font-size: 11px; margin-bottom: 3px;'><strong>목적:</strong> {summary['purpose']}</p>", unsafe_allow_html=True)
+                                if summary.get("method"):
+                                    st.markdown(f"<p style='font-size: 11px; margin-bottom: 3px;'><strong>방법:</strong> {summary['method']}</p>", unsafe_allow_html=True)
+                                if summary.get("result"):
+                                    st.markdown(f"<p style='font-size: 11px; margin-bottom: 3px;'><strong>결과:</strong> {summary['result']}</p>", unsafe_allow_html=True)
+                                if summary.get("implication"):
+                                    st.markdown(f"<p style='font-size: 11px; margin-bottom: 8px;'><strong>시사점:</strong> {summary['implication']}</p>", unsafe_allow_html=True)
+                                st.markdown("---")
+                            
+                            # 원본 Abstract
+                            st.markdown("**📄 원본 Abstract:**")
+                            st.markdown(f"<p style='font-size: 11px; line-height: 1.6;'>{abstract}</p>", unsafe_allow_html=True)
+                    elif summary and summary.get("purpose"):
+                        # Abstract가 없지만 해석된 요약이 있는 경우
+                        with st.expander("📋 AI 해석 요약", expanded=False):
+                            if summary.get("purpose"):
+                                st.markdown(f"<p style='font-size: 11px; margin-bottom: 3px;'><strong>목적:</strong> {summary['purpose']}</p>", unsafe_allow_html=True)
+                            if summary.get("method"):
+                                st.markdown(f"<p style='font-size: 11px; margin-bottom: 3px;'><strong>방법:</strong> {summary['method']}</p>", unsafe_allow_html=True)
+                            if summary.get("result"):
+                                st.markdown(f"<p style='font-size: 11px; margin-bottom: 3px;'><strong>결과:</strong> {summary['result']}</p>", unsafe_allow_html=True)
+                            if summary.get("implication"):
+                                st.markdown(f"<p style='font-size: 11px; margin-bottom: 3px;'><strong>시사점:</strong> {summary['implication']}</p>", unsafe_allow_html=True)
+                    
+                    # 저자 정보
                     if authors:
                         authors_str = ", ".join(authors[:3])
                         if len(authors) > 3:
                             authors_str += f" 외 {len(authors) - 3}명"
                         st.markdown(f"<p style='font-size: 11px; margin-bottom: 5px;'><strong>저자:</strong> {authors_str}</p>", unsafe_allow_html=True)
                     
-                    if summary:
-                        with st.expander("📋 요약 보기", expanded=False):
-                            if summary.get("purpose"):
-                                st.markdown(f"<p style='font-size: 11px;'><strong>목적:</strong> {summary['purpose']}</p>", unsafe_allow_html=True)
-                            if summary.get("method"):
-                                st.markdown(f"<p style='font-size: 11px;'><strong>방법:</strong> {summary['method']}</p>", unsafe_allow_html=True)
-                            if summary.get("result"):
-                                st.markdown(f"<p style='font-size: 11px;'><strong>결과:</strong> {summary['result']}</p>", unsafe_allow_html=True)
-                            if summary.get("implication"):
-                                st.markdown(f"<p style='font-size: 11px;'><strong>시사점:</strong> {summary['implication']}</p>", unsafe_allow_html=True)
-                    
-                    if abstract:
-                        with st.expander("📄 초록 보기", expanded=False):
-                            abstract_text = abstract[:300] + "..." if len(abstract) > 300 else abstract
-                            st.markdown(f"<p style='font-size: 11px;'>{abstract_text}</p>", unsafe_allow_html=True)
-                    
-                    if keywords:
-                        keyword_tags = " ".join([f"`{k}`" for k in keywords[:3]])
-                        st.markdown(f"<p style='font-size: 11px; margin-bottom: 5px;'><strong>키워드:</strong> {keyword_tags}</p>", unsafe_allow_html=True)
-                    
+                    # 원문 링크
                     if url:
-                        st.markdown(f"<a href='{url}' target='_blank' style='font-size: 11px;'>원문 보기 →</a>", unsafe_allow_html=True)
+                        st.markdown(f"<a href='{url}' target='_blank' style='font-size: 11px; color: #0066cc;'>원문 보기 →</a>", unsafe_allow_html=True)
                     
                     if idx < len(papers) - 1:
-                        st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
+                        st.markdown("<hr style='margin: 15px 0; border: none; border-top: 1px solid #e0e0e0;'>", unsafe_allow_html=True)
         else:
             st.info("📭 저장된 논문이 없습니다. 위의 '논문 수집' 버튼을 클릭하여 논문을 수집하세요.")
             

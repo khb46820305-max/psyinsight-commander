@@ -1047,6 +1047,62 @@ with st.sidebar:
     st.header("⚙️ 설정")
     st.info("프로젝트 초기화 완료!")
     
+    # 테스트 수집 버튼
+    st.divider()
+    st.subheader("🧪 테스트 수집")
+    if st.button("🧪 테스트 수집 (뉴스2개 + 논문2개)", type="secondary", key="test_collect_btn"):
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+        try:
+            from modules.news_collector import collect_and_analyze_news
+            from modules.paper_collector import collect_and_analyze_papers
+            
+            def update_progress(current, total, message):
+                progress = current / total if total > 0 else 0
+                progress_bar.progress(progress)
+                status_text.text(f"{message} ({current}/{total}) - {int(progress * 100)}%")
+            
+            # 1. 한국 뉴스 1개 수집
+            status_text.text("한국 뉴스 수집 중... (1/4)")
+            progress_bar.progress(0.1)
+            collected_kr, saved_kr = collect_and_analyze_news(
+                keywords=["심리건강"],
+                countries=["KR"],
+                max_per_keyword=1,
+                progress_callback=update_progress
+            )
+            
+            # 2. 외국 뉴스 1개 수집
+            status_text.text("외국 뉴스 수집 중... (2/4)")
+            progress_bar.progress(0.3)
+            collected_us, saved_us = collect_and_analyze_news(
+                keywords=["mental health"],
+                countries=["US"],
+                max_per_keyword=1,
+                progress_callback=update_progress
+            )
+            
+            # 3. 한국 논문 1개 수집 (한국 논문은 보통 DB에 없을 수 있으므로 외국 논문으로 대체)
+            status_text.text("논문 수집 중... (3/4)")
+            progress_bar.progress(0.6)
+            collected_papers, saved_papers = collect_and_analyze_papers(
+                keywords=["psychology"],
+                sources=["arxiv"],
+                max_per_keyword=2,  # 외국 논문 2개 (한국 논문은 보통 없음)
+                progress_callback=update_progress
+            )
+            
+            progress_bar.progress(1.0)
+            status_text.text("✅ 테스트 수집 완료!")
+            st.success(f"✅ 테스트 수집 완료!\n- 한국 뉴스: {saved_kr}개 저장\n- 외국 뉴스: {saved_us}개 저장\n- 논문: {saved_papers}개 저장")
+            st.info("💡 각 탭에서 수집된 내용을 확인하세요.")
+        except Exception as e:
+            st.error(f"❌ 테스트 수집 실패: {e}")
+            import traceback
+            st.code(traceback.format_exc())
+    
+    st.divider()
+    
     # 데이터베이스 초기화 버튼
     if st.button("🗄️ 데이터베이스 초기화"):
         try:

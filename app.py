@@ -900,9 +900,7 @@ elif selected_menu == "📈 경제 흐름 파악":
     with col1:
         st.markdown("거시경제, 산업 분석, 글로벌 시황 정보를 수집하고 분석합니다.")
     with col2:
-        col_btn1, col_btn2 = st.columns([1, 1])
-        with col_btn1:
-            if st.button("🔄 경제 흐름 파악하기", type="primary", key="economy_collect_btn"):
+        if st.button("🔄 경제 흐름 파악하기", type="primary", key="economy_collect_btn"):
                 progress_bar = st.progress(0)
                 status_text = st.empty()
                 try:
@@ -917,30 +915,6 @@ elif selected_menu == "📈 경제 흐름 파악":
                     progress_bar.progress(0.9)
                     status_text.text(f"✅ 수집 완료: {collected}개 수집, {saved}개 저장")
                     
-                    # 수집 완료 후 자동으로 보고서 생성 시도
-                    if saved > 0:
-                        status_text.text("📊 종합 보고서 자동 생성 중...")
-                        try:
-                            from modules.economy_collector import generate_daily_economy_report
-                            from datetime import datetime
-                            
-                            report = generate_daily_economy_report(force_regenerate=False)
-                            
-                            if report:
-                                st.session_state['economy_report'] = report
-                                st.session_state['economy_report_date'] = datetime.now().strftime("%Y-%m-%d")
-                                status_text.text(f"✅ 수집 완료: {collected}개 수집, {saved}개 저장 | 📊 보고서 자동 생성 완료")
-                                st.success(f"✅ 수집 완료: {collected}개 수집, {saved}개 저장\n📊 종합 보고서가 자동으로 생성되었습니다!")
-                            else:
-                                status_text.text(f"✅ 수집 완료: {collected}개 수집, {saved}개 저장")
-                                st.success(f"✅ 수집 완료: {collected}개 수집, {saved}개 저장")
-                        except Exception as e:
-                            logger.error(f"보고서 자동 생성 실패: {e}")
-                            status_text.text(f"✅ 수집 완료: {collected}개 수집, {saved}개 저장")
-                            st.success(f"✅ 수집 완료: {collected}개 수집, {saved}개 저장")
-                    else:
-                        status_text.text(f"✅ 수집 완료: {collected}개 수집, {saved}개 저장")
-                        st.success(f"✅ 수집 완료: {collected}개 수집, {saved}개 저장")
                     
                     progress_bar.progress(1.0)
                 except Exception as e:
@@ -948,92 +922,96 @@ elif selected_menu == "📈 경제 흐름 파악":
                     import traceback
                     st.code(traceback.format_exc())
         
-        with col_btn2:
-            col_report1, col_report2 = st.columns([1, 1])
-            with col_report1:
-                if st.button("📊 보고서 생성", type="secondary", key="economy_report_btn"):
-                    try:
-                        from modules.economy_collector import generate_daily_economy_report, check_report_exists, get_report_from_db, get_unused_news_ids
-                        from datetime import datetime
-                        
-                        today = datetime.now().strftime("%Y-%m-%d")
-                        
-                        # 기존 보고서 확인
-                        if check_report_exists(today):
-                            existing_report_data = get_report_from_db(today)
-                            if existing_report_data:
-                                # 사용되지 않은 새로운 뉴스 확인
-                                unused_ids = get_unused_news_ids(today)
-                                if unused_ids:
-                                    st.info(f"ℹ️ 오늘 날짜의 보고서가 있지만 새로운 뉴스 {len(unused_ids)}개가 추가되었습니다. 보고서를 업데이트합니다.")
-                                    # 보고서 업데이트 (새로운 뉴스 포함)
-                                    report = generate_daily_economy_report(force_regenerate=False)
-                                    if report:
-                                        st.success("✅ 보고서가 업데이트되었습니다!")
-                                        st.session_state['economy_report'] = report
-                                        st.session_state['economy_report_date'] = today
-                                    else:
-                                        st.warning("⚠️ 보고서 업데이트 실패.")
-                                else:
-                                    st.info("ℹ️ 오늘 날짜의 보고서가 이미 존재하고 새로운 뉴스가 없습니다. 아래에서 확인하세요.")
-                                    st.session_state['economy_report'] = existing_report_data["report_text"]
-                                    st.session_state['economy_report_date'] = today
-                            else:
-                                st.warning("⚠️ 보고서 이력은 있지만 내용을 불러올 수 없습니다.")
-                        else:
-                            with st.spinner("일일 경제 종합 보고서 생성 중..."):
-                                report = generate_daily_economy_report(force_regenerate=False)
-                                
-                                if report:
-                                    st.success("✅ 종합 보고서 생성 완료!")
-                                    st.session_state['economy_report'] = report
-                                    st.session_state['economy_report_date'] = today
-                                else:
-                                    st.warning("⚠️ 보고서 생성 실패. 먼저 경제 뉴스를 수집해주세요.")
-                    except Exception as e:
-                        st.error(f"❌ 오류 발생: {e}")
-                        import traceback
-                        st.code(traceback.format_exc())
-            
-            with col_report2:
-                if st.button("🔄 보고서 재생성", type="secondary", key="economy_report_regenerate_btn"):
-                    try:
-                        from modules.economy_collector import generate_daily_economy_report
-                        from datetime import datetime
-                        
-                        with st.spinner("보고서 재생성 중..."):
-                            report = generate_daily_economy_report(force_regenerate=True)
-                            
-                            if report:
-                                st.success("✅ 보고서 재생성 완료!")
-                                st.session_state['economy_report'] = report
-                                st.session_state['economy_report_date'] = datetime.now().strftime("%Y-%m-%d")
-                            else:
-                                st.warning("⚠️ 보고서 재생성 실패. 먼저 경제 뉴스를 수집해주세요.")
-                    except Exception as e:
-                        st.error(f"❌ 오류 발생: {e}")
-                        import traceback
-                        st.code(traceback.format_exc())
     
-    # 종합 보고서 표시
-    if 'economy_report' in st.session_state and st.session_state.get('economy_report'):
-        st.divider()
-        st.subheader(f"📊 일일 경제 종합 보고서 ({st.session_state.get('economy_report_date', '')})")
+    # 뉴스 헤드라인 표시
+    st.divider()
+    st.subheader("📋 경제 뉴스 헤드라인")
+    
+    # 헤드라인 표 스타일
+    st.markdown("""
+    <style>
+    .economy-headline-table {
+        font-size: 10pt !important;
+        line-height: 1.2 !important;
+    }
+    .economy-headline-table th {
+        font-size: 10pt !important;
+        padding: 4px 8px !important;
+        background-color: #f0f0f0;
+    }
+    .economy-headline-table td {
+        font-size: 10pt !important;
+        padding: 3px 8px !important;
+        line-height: 1.2 !important;
+    }
+    .economy-headline-table tr {
+        border-bottom: 1px solid #e0e0e0;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    try:
+        from modules.database import get_connection
+        from datetime import datetime, timedelta
         
-        # 보고서 표시
-        st.markdown("---")
-        st.markdown(st.session_state['economy_report'])
-        st.markdown("---")
+        conn = get_connection()
+        cursor = conn.cursor()
         
-        # 보고서 다운로드 버튼 (선택사항)
-        report_text = st.session_state['economy_report']
-        st.download_button(
-            label="📥 보고서 다운로드",
-            data=report_text,
-            file_name=f"경제종합보고서_{st.session_state.get('economy_report_date', datetime.now().strftime('%Y%m%d'))}.txt",
-            mime="text/plain",
-            key="download_report"
-        )
+        # 최근 7일간의 경제 뉴스 조회
+        end_date = datetime.now().strftime("%Y-%m-%d")
+        start_date = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
+        
+        cursor.execute("""
+            SELECT date, title, category, source, url
+            FROM economy_news
+            WHERE date BETWEEN ? AND ?
+            ORDER BY date DESC, created_at DESC
+            LIMIT 200
+        """, (start_date, end_date))
+        
+        news_list = cursor.fetchall()
+        conn.close()
+        
+        if news_list:
+            # 표 데이터 준비
+            table_data = []
+            for news in news_list:
+                date, title, category, source, url = news
+                table_data.append({
+                    "날짜": date,
+                    "제목": title[:80] + "..." if len(title) > 80 else title,
+                    "카테고리": category,
+                    "소스": source,
+                    "링크": url
+                })
+            
+            # DataFrame으로 변환하여 표시
+            import pandas as pd
+            df = pd.DataFrame(table_data)
+            
+            # 표 스타일 적용하여 표시
+            st.markdown('<div class="economy-headline-table">', unsafe_allow_html=True)
+            st.dataframe(
+                df,
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "날짜": st.column_config.TextColumn("날짜", width="small"),
+                    "제목": st.column_config.TextColumn("제목", width="large"),
+                    "카테고리": st.column_config.TextColumn("카테고리", width="small"),
+                    "소스": st.column_config.TextColumn("소스", width="small"),
+                    "링크": st.column_config.LinkColumn("링크", width="medium")
+                }
+            )
+            st.markdown('</div>', unsafe_allow_html=True)
+            
+            st.caption(f"총 {len(news_list)}개의 경제 뉴스가 표시됩니다.")
+        else:
+            st.info("📭 표시할 경제 뉴스가 없습니다. 먼저 경제 뉴스를 수집해주세요.")
+    except Exception as e:
+        st.error(f"❌ 뉴스 헤드라인 표시 중 오류 발생: {e}")
+        import traceback
+        st.code(traceback.format_exc())
     
     st.divider()
     

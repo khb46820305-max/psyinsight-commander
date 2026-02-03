@@ -652,7 +652,7 @@ def check_report_exists(date: str) -> bool:
         return False
 
 
-def save_report_to_db(date: str, report_text: str, news_count: int) -> bool:
+def save_report_to_db(date: str, report_text: str, news_count: int, used_news_ids: List[int] = None) -> bool:
     """
     생성된 보고서를 데이터베이스에 저장
     
@@ -660,6 +660,7 @@ def save_report_to_db(date: str, report_text: str, news_count: int) -> bool:
         date: 보고서 날짜
         report_text: 보고서 내용
         news_count: 사용된 뉴스 개수
+        used_news_ids: 보고서에 사용된 뉴스 ID 리스트
     
     Returns:
         저장 성공 여부
@@ -668,22 +669,26 @@ def save_report_to_db(date: str, report_text: str, news_count: int) -> bool:
         conn = get_connection()
         cursor = conn.cursor()
         
+        # 사용된 뉴스 ID를 JSON으로 저장
+        used_ids_json = json.dumps(used_news_ids or [], ensure_ascii=False)
+        
         # 기존 보고서가 있으면 업데이트, 없으면 삽입
         cursor.execute("""
-            INSERT OR REPLACE INTO economy_reports (date, report_text, news_count, created_at)
-            VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-        """, (date, report_text, news_count))
+            INSERT OR REPLACE INTO economy_reports 
+            (date, report_text, news_count, used_news_ids, updated_at)
+            VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+        """, (date, report_text, news_count, used_ids_json))
         
         conn.commit()
         conn.close()
-        logger.info(f"보고서 저장 완료: {date}")
+        logger.info(f"보고서 저장 완료: {date} (뉴스 {news_count}개 사용)")
         return True
     except Exception as e:
         logger.error(f"보고서 저장 실패: {e}")
         return False
 
 
-def get_report_from_db(date: str) -> Optional[str]:
+def get_report_from_db(date: str) -> Optional[Dict]:
     """
     데이터베이스에서 보고서 조회
     
@@ -691,24 +696,65 @@ def get_report_from_db(date: str) -> Optional[str]:
         date: 조회할 날짜
     
     Returns:
-        보고서 텍스트 (없으면 None)
+        {"report_text": str, "used_news_ids": List[int]} 또는 None
     """
     try:
         conn = get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT report_text FROM economy_reports WHERE date = ?", (date,))
+        cursor.execute("SELECT report_text, used_news_ids FROM economy_reports WHERE date = ?", (date,))
         result = cursor.fetchone()
         conn.close()
-        return result[0] if result else None
+        
+        if result:
+            report_text, used_ids_json = result
+            try:
+                used_ids = json.loads(used_ids_json) if used_ids_json else []
+            except:
+                used_ids = []
+            return {"report_text": report_text, "used_news_ids": used_ids}
+        return None
     except Exception as e:
         logger.error(f"보고서 조회 실패: {e}")
         return None
+
+
+def get_unused_news_ids(date: str) -> List[int]:
+    """
+    해당 날짜의 보고서에 사용되지 않은 뉴스 ID 조회
+    
+    Args:
+        date: 조회할 날짜
+    
+    Returns:
+        사용되지 않은 뉴스 ID 리스트
+    """
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        
+        # 해당 날짜의 모든 뉴스 ID 조회
+        cursor.execute("SELECT id FROM economy_news WHERE date = ?", (date,))
+        all_news_ids = [row[0] for row in cursor.fetchall()]
+        
+        # 보고서에 사용된 뉴스 ID 조회
+        report_data = get_report_from_db(date)
+        used_ids = report_data.get("used_news_ids", []) if report_data else []
+        
+        # 사용되지 않은 뉴스 ID
+        unused_ids = [nid for nid in all_news_ids if nid not in used_ids]
+        
+        conn.close()
+        return unused_ids
+    except Exception as e:
+        logger.error(f"미사용 뉴스 ID 조회 실패: {e}")
+        return []
 
 
 def generate_daily_economy_report(date: str = None, force_regenerate: bool = False) -> Optional[str]:
     """
     일일 경제 종합 보고서 생성
     수집된 모든 경제 뉴스를 종합하여 하나의 보고서로 작성
+    새로운 뉴스가 추가되면 기존 보고서를 업데이트
     
     Args:
         date: 보고서 날짜 (None이면 오늘 날짜)
@@ -720,20 +766,13 @@ def generate_daily_economy_report(date: str = None, force_regenerate: bool = Fal
     if date is None:
         date = datetime.now().strftime("%Y-%m-%d")
     
-    # 기존 보고서 확인 (재생성 강제가 아닌 경우)
-    if not force_regenerate:
-        existing_report = get_report_from_db(date)
-        if existing_report:
-            logger.info(f"{date} 날짜의 보고서가 이미 존재합니다.")
-            return existing_report
-    
     try:
         conn = get_connection()
         cursor = conn.cursor()
         
-        # 해당 날짜의 모든 경제 뉴스 조회
+        # 해당 날짜의 모든 경제 뉴스 조회 (ID 포함)
         cursor.execute("""
-            SELECT title, content_summary, category, source, keywords
+            SELECT id, title, content_summary, category, source, keywords
             FROM economy_news
             WHERE date = ?
             ORDER BY created_at DESC
@@ -746,21 +785,44 @@ def generate_daily_economy_report(date: str = None, force_regenerate: bool = Fal
             logger.warning(f"{date} 날짜의 경제 뉴스가 없습니다.")
             return None
         
+        # 기존 보고서 확인
+        existing_report_data = get_report_from_db(date)
+        used_news_ids = existing_report_data.get("used_news_ids", []) if existing_report_data else []
+        
+        # 사용되지 않은 새로운 뉴스가 있는지 확인
+        all_news_ids = [news[0] for news in all_news]
+        unused_news_ids = [nid for nid in all_news_ids if nid not in used_news_ids]
+        
+        # 재생성 강제가 아니고, 기존 보고서가 있고, 새로운 뉴스가 없으면 기존 보고서 반환
+        if not force_regenerate and existing_report_data and not unused_news_ids:
+            logger.info(f"{date} 날짜의 보고서가 이미 존재하고 새로운 뉴스가 없습니다.")
+            return existing_report_data["report_text"]
+        
+        # 새로운 뉴스가 있거나 재생성 강제인 경우 보고서 생성/업데이트
+        if unused_news_ids:
+            logger.info(f"{date} 날짜에 새로운 뉴스 {len(unused_news_ids)}개가 추가되었습니다. 보고서를 업데이트합니다.")
+        elif force_regenerate:
+            logger.info(f"{date} 날짜의 보고서를 강제로 재생성합니다.")
+        
         logger.info(f"{date} 날짜의 경제 뉴스 {len(all_news)}개를 종합하여 보고서 생성 중...")
         
-        # 뉴스 데이터를 카테고리별로 분류
+        # 뉴스 데이터를 카테고리별로 분류 (ID 포함)
         macro_economy = []  # 거시경제
         industry_analysis = []  # 산업분석
         global_market = []  # 글로벌시황
+        all_used_ids = []  # 보고서에 사용된 모든 뉴스 ID
         
         for news in all_news:
-            title, summary, category, source, keywords_json = news
+            news_id, title, summary, category, source, keywords_json = news
+            all_used_ids.append(news_id)  # 모든 뉴스를 사용
+            
             try:
                 keywords = json.loads(keywords_json) if keywords_json else []
             except:
                 keywords = []
             
             news_item = {
+                "id": news_id,
                 "title": title,
                 "summary": summary or title,
                 "source": source,
@@ -837,10 +899,10 @@ def generate_daily_economy_report(date: str = None, force_regenerate: bool = Fal
             )
             
             report = response.text.strip()
-            logger.info(f"일일 경제 종합 보고서 생성 완료: {len(report)}자")
+            logger.info(f"일일 경제 종합 보고서 생성 완료: {len(report)}자 (뉴스 {len(all_news)}개 사용)")
             
-            # 보고서를 데이터베이스에 저장
-            save_report_to_db(date, report, len(all_news))
+            # 보고서를 데이터베이스에 저장 (사용된 뉴스 ID 포함)
+            save_report_to_db(date, report, len(all_news), all_used_ids)
             
             return report
             

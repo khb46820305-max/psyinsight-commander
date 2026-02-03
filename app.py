@@ -953,18 +953,31 @@ elif selected_menu == "📈 경제 흐름 파악":
             with col_report1:
                 if st.button("📊 보고서 생성", type="secondary", key="economy_report_btn"):
                     try:
-                        from modules.economy_collector import generate_daily_economy_report, check_report_exists, get_report_from_db
+                        from modules.economy_collector import generate_daily_economy_report, check_report_exists, get_report_from_db, get_unused_news_ids
                         from datetime import datetime
                         
                         today = datetime.now().strftime("%Y-%m-%d")
                         
                         # 기존 보고서 확인
                         if check_report_exists(today):
-                            existing_report = get_report_from_db(today)
-                            if existing_report:
-                                st.info("ℹ️ 오늘 날짜의 보고서가 이미 존재합니다. 아래에서 확인하세요.")
-                                st.session_state['economy_report'] = existing_report
-                                st.session_state['economy_report_date'] = today
+                            existing_report_data = get_report_from_db(today)
+                            if existing_report_data:
+                                # 사용되지 않은 새로운 뉴스 확인
+                                unused_ids = get_unused_news_ids(today)
+                                if unused_ids:
+                                    st.info(f"ℹ️ 오늘 날짜의 보고서가 있지만 새로운 뉴스 {len(unused_ids)}개가 추가되었습니다. 보고서를 업데이트합니다.")
+                                    # 보고서 업데이트 (새로운 뉴스 포함)
+                                    report = generate_daily_economy_report(force_regenerate=False)
+                                    if report:
+                                        st.success("✅ 보고서가 업데이트되었습니다!")
+                                        st.session_state['economy_report'] = report
+                                        st.session_state['economy_report_date'] = today
+                                    else:
+                                        st.warning("⚠️ 보고서 업데이트 실패.")
+                                else:
+                                    st.info("ℹ️ 오늘 날짜의 보고서가 이미 존재하고 새로운 뉴스가 없습니다. 아래에서 확인하세요.")
+                                    st.session_state['economy_report'] = existing_report_data["report_text"]
+                                    st.session_state['economy_report_date'] = today
                             else:
                                 st.warning("⚠️ 보고서 이력은 있지만 내용을 불러올 수 없습니다.")
                         else:

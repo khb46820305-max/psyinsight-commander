@@ -93,7 +93,9 @@ def create_tables(conn):
             date DATE NOT NULL UNIQUE,
             report_text TEXT NOT NULL,
             news_count INTEGER,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            used_news_ids TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
     

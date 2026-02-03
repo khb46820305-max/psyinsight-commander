@@ -311,6 +311,7 @@ def collect_and_analyze_papers(keywords: List[str] = None, sources: List[str] = 
         total_collected += 1
         
         abstract = paper.get("abstract", "")
+        title = paper.get("title", "")
         if not abstract:
             continue
         

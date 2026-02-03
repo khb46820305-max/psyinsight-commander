@@ -221,13 +221,19 @@ def process_single_news(news: Dict, country: str) -> Optional[Dict]:
         return None
     
     # 제목 기반 관련성 필터링 (스크래핑 전에 먼저 체크)
+    # 하지만 너무 엄격하게 필터링하지 않도록 키워드 확대
     title_lower = news.get("title", "").lower()
-    relevant_keywords = ["심리", "정신", "마음", "우울", "불안", "트라우마", "상담", "치료", "psychology", "mental", "counseling", "therapy", "depression", "anxiety", "trauma"]
+    relevant_keywords = [
+        "심리", "정신", "마음", "우울", "불안", "트라우마", "상담", "치료", "인지", "행동",
+        "psychology", "mental", "counseling", "therapy", "depression", "anxiety", "trauma",
+        "cognitive", "behavior", "brain", "neuroscience", "psychiatry", "wellness", "health"
+    ]
     is_relevant = any(kw in title_lower for kw in relevant_keywords)
     
+    # 관련성 체크는 경고만 하고 스킵하지 않음 (본문에서 확인 가능하도록)
     if not is_relevant:
-        logger.info(f"관련 없는 뉴스 스킵: {news.get('title', '')[:50]}")
-        return None
+        logger.info(f"관련성 낮은 뉴스 (제목만): {news.get('title', '')[:50]}")
+        # 스킵하지 않고 계속 진행 (본문에서 관련성 확인 가능)
     
     # 기사 본문 스크래핑
     full_text = scrape_article_content(url)

@@ -1197,10 +1197,21 @@ elif selected_menu == "🧪 테스트":
                 st.markdown("#### 🌍 외국 뉴스")
                 for news in test_results["us_news"]:
                     news_id, title, date, country, url, summary, keywords, rating = news
-                    st.markdown(f"**{title}**")
+                    # 제목이 "원제 (번역)" 형식인지 확인
+                    if " (" in title and title.endswith(")"):
+                        parts = title.rsplit(" (", 1)
+                        if len(parts) == 2:
+                            original_title = parts[0]
+                            translated_title = parts[1].rstrip(")")
+                            st.markdown(f"**{translated_title}**")
+                            st.markdown(f"<p style='font-size: 11px; color: #666;'>(원제: {original_title})</p>", unsafe_allow_html=True)
+                        else:
+                            st.markdown(f"**{title}**")
+                    else:
+                        st.markdown(f"**{title}**")
                     st.markdown(f"📅 {date} | 🌍 {country} | ⭐ {rating}/5")
                     if summary:
-                        st.markdown(f"요약: {summary[:150]}...")
+                        st.markdown(f"**요약:** {summary}")
                     if url:
                         st.markdown(f"[원문 보기 →]({url})")
                     st.markdown("---")

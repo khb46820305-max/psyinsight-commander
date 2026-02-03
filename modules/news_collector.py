@@ -41,9 +41,14 @@ def fetch_news_from_rss(keywords: List[str], country: str = "KR", max_results: i
     
     for keyword in keywords:
         try:
-            # Google News RSS URL 생성
+            # 한국 뉴스의 경우 더 구체적인 검색어 조합
             if country == "KR":
-                rss_url = f"https://news.google.com/rss/search?q={keyword}&hl=ko&gl=KR&ceid=KR:ko"
+                # 심리/상담 관련 키워드만 필터링
+                search_query = keyword
+                # 제외 키워드 추가 (법률 상담, 디지털 상담 등 제외)
+                if "상담" in keyword or "심리" in keyword:
+                    search_query = f"{keyword} -법률 -법무 -디지털 -IT -건설 -공제회"
+                rss_url = f"https://news.google.com/rss/search?q={search_query}&hl=ko&gl=KR&ceid=KR:ko"
             else:  # US
                 rss_url = f"https://news.google.com/rss/search?q={keyword}&hl=en&gl=US&ceid=US:en"
             
@@ -204,7 +209,7 @@ def collect_and_analyze_news(keywords: List[str] = None, countries: List[str] = 
         max_per_keyword: 키워드당 최대 수집 개수
     """
     if keywords is None:
-        keywords = ["심리", "마음건강", "뇌과학", "상담", "psychology", "mental health", "neuroscience", "counseling"]
+        keywords = ["정신건강", "심리건강", "마음건강", "심리상담", "심리학이론", "심리학", "정신건강증진", "우울증", "불안장애", "트라우마", "상담심리", "임상심리", "psychology", "mental health", "counseling psychology", "clinical psychology", "depression", "anxiety", "trauma"]
     
     if countries is None:
         countries = ["KR", "US"]
@@ -243,10 +248,23 @@ def collect_and_analyze_news(keywords: List[str] = None, countries: List[str] = 
                 logger.warning(f"본문 추출 실패, 제목만 저장: {url}")
                 full_text = news.get("title", "")
             
+            # 제목 기반 관련성 필터링 (심리/정신건강 관련 키워드 체크)
+            title_lower = news.get("title", "").lower()
+            relevant_keywords = ["심리", "정신", "마음", "우울", "불안", "트라우마", "상담", "치료", "psychology", "mental", "counseling", "therapy", "depression", "anxiety", "trauma"]
+            is_relevant = any(kw in title_lower for kw in relevant_keywords)
+            
+            # 관련 없는 뉴스는 스킵 (제목에 관련 키워드가 없으면)
+            if not is_relevant:
+                logger.info(f"관련 없는 뉴스 스킵: {news.get('title', '')[:50]}")
+                continue
+            
             # AI 분석
             try:
                 # 요약 생성
                 summary = generate_summary(full_text[:2000])  # 최대 2000자만 전달
+                if not summary or summary == "요약 생성에 실패했습니다.":
+                    # 제목을 기반으로 간단한 요약 생성
+                    summary = f"{news.get('title', '')[:100]}..."
                 
                 # 전문성 평가
                 evaluation = evaluate_article(full_text[:2000])
@@ -257,7 +275,8 @@ def collect_and_analyze_news(keywords: List[str] = None, countries: List[str] = 
                 
             except Exception as e:
                 logger.error(f"AI 분석 실패: {e}")
-                summary = "요약 생성 실패"
+                # 기본값 설정
+                summary = f"{news.get('title', '')[:100]}..." if news.get('title') else "요약을 생성할 수 없습니다."
                 validity_score = 3
                 keywords_list = []
             

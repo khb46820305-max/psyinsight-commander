@@ -38,7 +38,7 @@ with tab1:
                 try:
                     from modules.news_collector import collect_and_analyze_news
                     collected, saved = collect_and_analyze_news(
-                        keywords=["심리", "마음건강", "뇌과학", "상담"],
+                        keywords=["정신건강", "심리건강", "마음건강", "심리상담", "심리학이론", "심리학", "정신건강증진", "우울증", "불안장애", "트라우마", "상담심리", "임상심리"],
                         countries=["KR", "US"],
                         max_per_keyword=5
                     )
@@ -194,13 +194,18 @@ with tab2:
                 try:
                     from modules.paper_collector import collect_and_analyze_papers
                     collected, saved = collect_and_analyze_papers(
-                        keywords=["psychology", "counseling"],
+                        keywords=["psychology", "counseling psychology", "clinical psychology", "mental health"],
                         sources=["arxiv"],
                         max_per_keyword=5
                     )
-                    st.success(f"✅ 수집 완료: {collected}개 수집, {saved}개 저장")
+                    if collected > 0:
+                        st.success(f"✅ 수집 완료: {collected}개 수집, {saved}개 저장")
+                    else:
+                        st.warning("⚠️ 수집된 논문이 없습니다. 키워드를 확인해주세요.")
                 except Exception as e:
                     st.error(f"❌ 오류 발생: {e}")
+                    import traceback
+                    st.code(traceback.format_exc())
     
     st.divider()
     
@@ -403,12 +408,23 @@ with tab3:
                     from modules.ai_engine import get_model
                     import google.generativeai as genai
                     
-                    # 선택된 콘텐츠 요약
+                    # 선택된 콘텐츠 수집
                     selected_content = []
                     for news in selected_news:
-                        selected_content.append(f"뉴스: {news['title']}\n{news['summary']}")
+                        content = f"뉴스: {news['title']}\n"
+                        if news.get('summary'):
+                            content += f"요약: {news['summary']}\n"
+                        selected_content.append(content)
+                    
                     for paper in selected_papers:
-                        selected_content.append(f"논문: {paper['title']}\n{paper['abstract'][:500]}")
+                        content = f"논문: {paper['title']}\n"
+                        if paper.get('abstract'):
+                            content += f"초록: {paper['abstract'][:500]}\n"
+                        selected_content.append(content)
+                    
+                    if not selected_content:
+                        st.error("선택된 콘텐츠가 없습니다.")
+                        st.stop()
                     
                     content_text = "\n\n".join(selected_content)
                     
@@ -416,6 +432,7 @@ with tab3:
                     prompts = {
                         "블로그 포스트": f"""다음 콘텐츠를 바탕으로 전문적인 블로그 포스트를 작성해주세요.
 구조: 제목, 서론, 본문(3-4개 섹션), 결론
+전문적이고 읽기 쉽게 작성해주세요.
 
 콘텐츠:
 {content_text[:3000]}
@@ -423,6 +440,7 @@ with tab3:
 블로그 포스트:""",
                         "릴스 대본": f"""다음 콘텐츠를 바탕으로 30초 분량의 릴스 대본을 작성해주세요.
 구조: 훅(첫 3초 주목), 본문(핵심 내용), CTA(행동 유도)
+간결하고 임팩트 있게 작성해주세요.
 
 콘텐츠:
 {content_text[:2000]}
@@ -430,6 +448,7 @@ with tab3:
 릴스 대본:""",
                         "게시글": f"""다음 콘텐츠를 바탕으로 SNS용 게시글을 작성해주세요.
 200자 내외, 해시태그 포함
+친근하고 공유하기 좋게 작성해주세요.
 
 콘텐츠:
 {content_text[:2000]}
@@ -437,6 +456,7 @@ with tab3:
 게시글:""",
                         "논문 아이디어": f"""다음 논문들을 바탕으로 새로운 연구 아이디어를 제안해주세요.
 구조: 연구 주제, 연구 질문, 예상 방법론, 참고 논문
+학술적이고 구체적으로 작성해주세요.
 
 콘텐츠:
 {content_text[:3000]}
@@ -445,19 +465,25 @@ with tab3:
                     }
                     
                     model = get_model()
+                    prompt = prompts.get(template, prompts["블로그 포스트"])
                     response = model.generate_content(
-                        prompts[template],
+                        prompt,
                         generation_config={"temperature": 0.7, "max_output_tokens": 2000}
                     )
                     
-                    generated_content = response.text
+                    generated_content = response.text.strip()
                     
-                    st.success("✅ 콘텐츠 생성 완료!")
-                    st.markdown("### 생성된 콘텐츠")
-                    st.text_area("", generated_content, height=400)
-                    
-                    # 복사 버튼
-                    st.code(generated_content, language=None)
+                    if generated_content:
+                        st.success("✅ 콘텐츠 생성 완료!")
+                        st.markdown("### 생성된 콘텐츠")
+                        st.markdown(f"**템플릿:** {template}")
+                        st.text_area("생성된 콘텐츠", generated_content, height=400, key="generated_content")
+                        
+                        # 복사용 코드 블록
+                        st.markdown("**복사용:**")
+                        st.code(generated_content, language=None)
+                    else:
+                        st.error("콘텐츠 생성에 실패했습니다. 다시 시도해주세요.")
                     
                 except Exception as e:
                     st.error(f"콘텐츠 생성 실패: {e}")

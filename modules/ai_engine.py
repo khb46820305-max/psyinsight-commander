@@ -78,12 +78,18 @@ def generate_summary(text: str, max_retries: int = 3) -> str:
                 }
             )
             summary = response.text.strip()
-            logger.info("요약 생성 완료")
-            return summary
+            if summary and len(summary) > 10:  # 최소 길이 체크
+                logger.info("요약 생성 완료")
+                return summary
+            else:
+                raise ValueError("요약이 너무 짧거나 비어있습니다.")
         except Exception as e:
             logger.warning(f"요약 생성 실패 (시도 {attempt + 1}/{max_retries}): {e}")
             if attempt == max_retries - 1:
-                return "요약 생성에 실패했습니다."
+                # 텍스트의 첫 부분을 요약으로 사용
+                lines = text.split('\n')[:3]
+                fallback_summary = ' '.join([line.strip() for line in lines if line.strip()])[:200]
+                return fallback_summary if fallback_summary else "요약을 생성할 수 없습니다."
             import time
             time.sleep(2 ** attempt)  # 지수 백오프
 

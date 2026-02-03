@@ -879,6 +879,177 @@ with tab4:
             except Exception as e:
                 st.error(f"❌ 삭제 중 오류 발생: {e}")
 
+# Tab 5: 경제 흐름 파악
+with tab5:
+    st.header("📈 경제 흐름 파악")
+    
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        st.markdown("거시경제, 산업 분석, 글로벌 시황 정보를 수집하고 분석합니다.")
+    with col2:
+        if st.button("🔄 경제 흐름 파악하기", type="primary", key="economy_collect_btn"):
+            progress_bar = st.progress(0)
+            status_text = st.empty()
+            try:
+                from modules.economy_collector import collect_economy_news
+                
+                def update_progress(current, total, message):
+                    progress = current / total if total > 0 else 0
+                    progress_bar.progress(progress)
+                    status_text.text(f"{message} ({current}/{total}) - {int(progress * 100)}%")
+                
+                collected, saved = collect_economy_news(progress_callback=update_progress)
+                progress_bar.progress(1.0)
+                status_text.text(f"✅ 수집 완료: {collected}개 수집, {saved}개 저장")
+                st.success(f"✅ 수집 완료: {collected}개 수집, {saved}개 저장")
+            except Exception as e:
+                st.error(f"❌ 오류 발생: {e}")
+                import traceback
+                st.code(traceback.format_exc())
+    
+    st.divider()
+    
+    try:
+        from modules.database import get_connection
+        import json
+        
+        conn = get_connection()
+        cursor = conn.cursor()
+        
+        # 검색 및 필터 기능
+        col1, col2, col3 = st.columns([2, 1, 1])
+        
+        with col1:
+            search_query = st.text_input("🔍 검색", placeholder="제목, 요약, 키워드로 검색...", key="economy_search")
+        
+        with col2:
+            sort_option = st.selectbox("정렬", ["최신순", "오래된순"], key="economy_sort")
+        
+        with col3:
+            category_filter = st.selectbox("카테고리", ["전체", "거시경제", "산업분석", "글로벌시황"], key="economy_category")
+        
+        # 소스 필터
+        cursor.execute("SELECT DISTINCT source FROM economy_news WHERE source IS NOT NULL")
+        all_sources = [row[0] for row in cursor.fetchall() if row[0]]
+        
+        if all_sources:
+            selected_sources = st.multiselect("📊 소스 필터", sorted(all_sources), key="economy_sources")
+        else:
+            selected_sources = []
+        
+        # SQL 쿼리 구성
+        where_conditions = []
+        params = []
+        
+        # 검색 조건
+        if search_query:
+            where_conditions.append("(title LIKE ? OR content_summary LIKE ? OR keywords LIKE ?)")
+            search_param = f"%{search_query}%"
+            params.extend([search_param, search_param, search_param])
+        
+        # 카테고리 필터
+        if category_filter != "전체":
+            where_conditions.append("category = ?")
+            params.append(category_filter)
+        
+        # 소스 필터
+        if selected_sources:
+            source_conditions = []
+            for source in selected_sources:
+                source_conditions.append("source = ?")
+                params.append(source)
+            where_conditions.append(f"({' OR '.join(source_conditions)})")
+        
+        where_clause = " AND ".join(where_conditions) if where_conditions else "1=1"
+        
+        # 정렬
+        order_by = "created_at DESC" if sort_option == "최신순" else "created_at ASC"
+        
+        # 페이지네이션
+        page_size = 20
+        page = st.number_input("페이지", min_value=1, value=1, step=1, key="economy_page")
+        offset = (page - 1) * page_size
+        
+        # 경제 뉴스 조회
+        query = f"""
+            SELECT id, date, title, url, content_summary, keywords, source, category
+            FROM economy_news
+            WHERE {where_clause}
+            ORDER BY {order_by}
+            LIMIT ? OFFSET ?
+        """
+        params.extend([page_size, offset])
+        
+        cursor.execute(query, params)
+        
+        economy_items = cursor.fetchall()
+        conn.close()
+        
+        if economy_items:
+            st.markdown(f"<h4 style='font-size: 16px; margin-bottom: 10px;'>📄 경제 정보 목록 (총 {len(economy_items)}개 표시)</h4>", unsafe_allow_html=True)
+            
+            for idx, item in enumerate(economy_items):
+                item_id, date, title, url, summary, keywords_json, source, category = item
+                
+                # 키워드 파싱
+                try:
+                    keywords = json.loads(keywords_json) if keywords_json else []
+                except:
+                    keywords = []
+                
+                # 카드 형태로 표시
+                with st.container():
+                    col1, col2 = st.columns([4, 1])
+                    
+                    with col1:
+                        st.markdown(f"<h5 style='font-size: 14px; font-weight: bold; margin-bottom: 5px;'>{title}</h5>", unsafe_allow_html=True)
+                        st.markdown(f"<p style='font-size: 11px; color: #666; margin-bottom: 5px;'>📅 {date} | 📊 {source} | 🏷️ {category}</p>", unsafe_allow_html=True)
+                        
+                        if summary:
+                            st.markdown(f"<p style='font-size: 12px; margin-bottom: 5px;'><strong>요약:</strong> {summary[:150]}{'...' if len(summary) > 150 else ''}</p>", unsafe_allow_html=True)
+                        
+                        if keywords:
+                            keyword_tags = " ".join([f"`{k}`" for k in keywords[:3]])
+                            st.markdown(f"<p style='font-size: 11px; margin-bottom: 5px;'><strong>키워드:</strong> {keyword_tags}</p>", unsafe_allow_html=True)
+                        
+                        if url:
+                            st.markdown(f"<a href='{url}' target='_blank' style='font-size: 11px;'>원문 보기 →</a>", unsafe_allow_html=True)
+                    
+                    with col2:
+                        # 카테고리 배지
+                        category_colors = {
+                            "거시경제": "#4CAF50",
+                            "산업분석": "#2196F3",
+                            "글로벌시황": "#FF9800"
+                        }
+                        color = category_colors.get(category, "#666")
+                        st.markdown(f"<div style='background-color: {color}; color: white; padding: 5px 10px; border-radius: 12px; font-size: 10px; text-align: center;'>{category}</div>", unsafe_allow_html=True)
+                    
+                    if idx < len(economy_items) - 1:
+                        st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
+        else:
+            st.info("📭 저장된 경제 정보가 없습니다. 위의 '경제 흐름 파악하기' 버튼을 클릭하여 정보를 수집하세요.")
+            
+    except Exception as e:
+        st.error(f"데이터베이스 조회 오류: {e}")
+        st.info("데이터베이스가 초기화되지 않았을 수 있습니다. 사이드바에서 '데이터베이스 초기화' 버튼을 클릭하세요.")
+    
+    # 맨 위로 버튼
+    st.markdown("<div style='text-align: center; margin: 30px 0; padding: 20px;'>", unsafe_allow_html=True)
+    if st.button("맨 위로 이동", key="scroll_top_tab5", use_container_width=False):
+        st.session_state.scroll_to_top_tab5 = True
+        st.rerun()
+    if st.session_state.get("scroll_to_top_tab5", False):
+        st.markdown("""
+        <script>
+        window.scrollTo(0, 0);
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
+        </script>
+        """, unsafe_allow_html=True)
+        st.session_state.scroll_to_top_tab5 = False
+    st.markdown("</div>", unsafe_allow_html=True)
+
 # 사이드바
 with st.sidebar:
     st.header("⚙️ 설정")

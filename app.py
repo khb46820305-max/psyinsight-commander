@@ -56,18 +56,93 @@ st.markdown(scroll_to_top_js, unsafe_allow_html=True)
 st.title("🧠 PsyInsight Commander")
 st.markdown("### 심리 인사이트 통합 지휘소")
 
-# 탭 생성
-tab1, tab2, tab3, tab4, tab5 = st.tabs([
-    "📰 사이콜로지 트랜드 레이더",
-    "📚 아카데믹 아카이브",
-    "✨ 콘텐츠 팩토리",
-    "🗑️ 수집 내용 관리",
-    "📈 경제 흐름 파악"
-])
+# 사이드바 메뉴 생성
+with st.sidebar:
+    st.header("📋 메뉴")
+    
+    menu_options = [
+        "📰 트랜드 레이더",
+        "📚 아카이브",
+        "✨ 팩토리",
+        "📈 경제 흐름 파악",
+        "🗑️ 수집 내용 관리",
+        "🧪 테스트",
+        "⚙️ 설정",
+        "🗄️ 초기화"
+    ]
+    
+    selected_menu = st.radio("메뉴 선택", menu_options, key="main_menu")
+    
+    st.divider()
+    
+    # 테스트 수집 버튼
+    if st.button("🧪 테스트 수집 (뉴스2개 + 논문2개)", type="secondary", key="test_collect_btn", use_container_width=True):
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+        try:
+            from modules.news_collector import collect_and_analyze_news
+            from modules.paper_collector import collect_and_analyze_papers
+            
+            def update_progress(current, total, message):
+                progress = current / total if total > 0 else 0
+                progress_bar.progress(progress)
+                status_text.text(f"{message} ({current}/{total}) - {int(progress * 100)}%")
+            
+            # 1. 한국 뉴스 1개 수집
+            status_text.text("한국 뉴스 수집 중... (1/4)")
+            progress_bar.progress(0.1)
+            collected_kr, saved_kr = collect_and_analyze_news(
+                keywords=["심리건강"],
+                countries=["KR"],
+                max_per_keyword=1,
+                progress_callback=update_progress
+            )
+            
+            # 2. 외국 뉴스 1개 수집
+            status_text.text("외국 뉴스 수집 중... (2/4)")
+            progress_bar.progress(0.3)
+            collected_us, saved_us = collect_and_analyze_news(
+                keywords=["mental health"],
+                countries=["US"],
+                max_per_keyword=1,
+                progress_callback=update_progress
+            )
+            
+            # 3. 논문 수집
+            status_text.text("논문 수집 중... (3/4)")
+            progress_bar.progress(0.6)
+            collected_papers, saved_papers = collect_and_analyze_papers(
+                keywords=["psychology"],
+                sources=["arxiv"],
+                max_per_keyword=2,
+                progress_callback=update_progress
+            )
+            
+            progress_bar.progress(1.0)
+            status_text.text("✅ 테스트 수집 완료!")
+            st.success(f"✅ 테스트 수집 완료!\n- 한국 뉴스: {saved_kr}개 저장\n- 외국 뉴스: {saved_us}개 저장\n- 논문: {saved_papers}개 저장")
+            st.info("💡 각 메뉴에서 수집된 내용을 확인하세요.")
+        except Exception as e:
+            st.error(f"❌ 테스트 수집 실패: {e}")
+            import traceback
+            st.code(traceback.format_exc())
+    
+    st.divider()
+    
+    # 데이터베이스 초기화 버튼
+    if st.button("🗄️ 데이터베이스 초기화", use_container_width=True):
+        try:
+            from modules.database import init_database
+            init_database()
+            st.success("데이터베이스 초기화 완료! (테이블 재생성)")
+            st.info("💡 수집된 내용을 삭제하려면 '수집 내용 관리' 메뉴를 사용하세요.")
+        except Exception as e:
+            st.error(f"오류 발생: {e}")
 
-# Tab 1: 사이콜로지 트랜드 레이더
-with tab1:
-    st.header("📰 사이콜로지 트랜드 레이더")
+# 메인 콘텐츠 영역
+# 1. 트랜드 레이더
+if selected_menu == "📰 트랜드 레이더":
+    st.header("📰 트랜드 레이더")
     
     # 뉴스 수집 버튼
     col1, col2 = st.columns([3, 1])
@@ -279,8 +354,8 @@ with tab1:
         st.session_state.scroll_to_top = False
     st.markdown("</div>", unsafe_allow_html=True)
 
-# Tab 2: 아카데믹 아카이브
-with tab2:
+# 2. 아카이브
+elif selected_menu == "📚 아카이브":
     st.header("📚 아카데믹 아카이브")
     
     col1, col2 = st.columns([3, 1])
@@ -508,8 +583,8 @@ with tab2:
         st.session_state.scroll_to_top_tab2 = False
     st.markdown("</div>", unsafe_allow_html=True)
 
-# Tab 3: 콘텐츠 팩토리
-with tab3:
+# 3. 팩토리
+elif selected_menu == "✨ 팩토리":
     st.header("✨ 콘텐츠 팩토리")
     st.markdown("Tab 1~2에서 선택한 콘텐츠를 다양한 형태로 재생산합니다.")
     
@@ -700,8 +775,8 @@ with tab3:
         st.session_state.scroll_to_top_tab3 = False
     st.markdown("</div>", unsafe_allow_html=True)
 
-# Tab 4: 수집 내용 관리
-with tab4:
+# 4. 수집 내용 관리
+elif selected_menu == "🗑️ 수집 내용 관리":
     st.header("🗑️ 수집 내용 관리")
     st.markdown("수집된 뉴스와 논문을 선택하여 삭제할 수 있습니다.")
     
@@ -871,8 +946,8 @@ with tab4:
             except Exception as e:
                 st.error(f"❌ 삭제 중 오류 발생: {e}")
 
-# Tab 5: 경제 흐름 파악
-with tab5:
+# 5. 경제 흐름 파악
+elif selected_menu == "📈 경제 흐름 파악":
     st.header("📈 경제 흐름 파악")
     
     col1, col2 = st.columns([3, 1])
@@ -1042,73 +1117,47 @@ with tab5:
         st.session_state.scroll_to_top_tab5 = False
     st.markdown("</div>", unsafe_allow_html=True)
 
-# 사이드바
-with st.sidebar:
+# 6. 테스트
+elif selected_menu == "🧪 테스트":
+    st.header("🧪 테스트")
+    st.info("테스트 수집은 좌측 사이드바의 '테스트 수집' 버튼을 사용하세요.")
+    st.markdown("""
+    ### 테스트 수집 기능
+    - 한국 뉴스 1개 수집
+    - 외국 뉴스 1개 수집
+    - 논문 2개 수집
+    
+    좌측 사이드바에서 "🧪 테스트 수집 (뉴스2개 + 논문2개)" 버튼을 클릭하세요.
+    """)
+
+# 7. 설정
+elif selected_menu == "⚙️ 설정":
     st.header("⚙️ 설정")
     st.info("프로젝트 초기화 완료!")
+    st.markdown("""
+    ### 주요 기능
+    - 📰 **트랜드 레이더**: 심리 관련 뉴스 수집 및 분석
+    - 📚 **아카이브**: 학술 논문 수집 및 분석
+    - ✨ **팩토리**: 수집된 콘텐츠로 다양한 형태의 콘텐츠 생성
+    - 📈 **경제 흐름 파악**: 경제 정보 수집 및 분석
+    - 🗑️ **수집 내용 관리**: 수집된 뉴스 및 논문 관리
+    """)
+
+# 8. 초기화
+elif selected_menu == "🗄️ 초기화":
+    st.header("🗄️ 데이터베이스 초기화")
+    st.warning("⚠️ 이 작업은 데이터베이스 테이블을 재생성합니다. 수집된 내용은 삭제되지 않습니다.")
+    st.info("💡 수집된 내용을 삭제하려면 '수집 내용 관리' 메뉴를 사용하세요.")
     
-    # 테스트 수집 버튼
-    st.divider()
-    st.subheader("🧪 테스트 수집")
-    if st.button("🧪 테스트 수집 (뉴스2개 + 논문2개)", type="secondary", key="test_collect_btn"):
-        progress_bar = st.progress(0)
-        status_text = st.empty()
-        try:
-            from modules.news_collector import collect_and_analyze_news
-            from modules.paper_collector import collect_and_analyze_papers
-            
-            def update_progress(current, total, message):
-                progress = current / total if total > 0 else 0
-                progress_bar.progress(progress)
-                status_text.text(f"{message} ({current}/{total}) - {int(progress * 100)}%")
-            
-            # 1. 한국 뉴스 1개 수집
-            status_text.text("한국 뉴스 수집 중... (1/4)")
-            progress_bar.progress(0.1)
-            collected_kr, saved_kr = collect_and_analyze_news(
-                keywords=["심리건강"],
-                countries=["KR"],
-                max_per_keyword=1,
-                progress_callback=update_progress
-            )
-            
-            # 2. 외국 뉴스 1개 수집
-            status_text.text("외국 뉴스 수집 중... (2/4)")
-            progress_bar.progress(0.3)
-            collected_us, saved_us = collect_and_analyze_news(
-                keywords=["mental health"],
-                countries=["US"],
-                max_per_keyword=1,
-                progress_callback=update_progress
-            )
-            
-            # 3. 한국 논문 1개 수집 (한국 논문은 보통 DB에 없을 수 있으므로 외국 논문으로 대체)
-            status_text.text("논문 수집 중... (3/4)")
-            progress_bar.progress(0.6)
-            collected_papers, saved_papers = collect_and_analyze_papers(
-                keywords=["psychology"],
-                sources=["arxiv"],
-                max_per_keyword=2,  # 외국 논문 2개 (한국 논문은 보통 없음)
-                progress_callback=update_progress
-            )
-            
-            progress_bar.progress(1.0)
-            status_text.text("✅ 테스트 수집 완료!")
-            st.success(f"✅ 테스트 수집 완료!\n- 한국 뉴스: {saved_kr}개 저장\n- 외국 뉴스: {saved_us}개 저장\n- 논문: {saved_papers}개 저장")
-            st.info("💡 각 탭에서 수집된 내용을 확인하세요.")
-        except Exception as e:
-            st.error(f"❌ 테스트 수집 실패: {e}")
-            import traceback
-            st.code(traceback.format_exc())
-    
-    st.divider()
-    
-    # 데이터베이스 초기화 버튼
-    if st.button("🗄️ 데이터베이스 초기화"):
+    if st.button("🗄️ 데이터베이스 초기화", type="primary"):
         try:
             from modules.database import init_database
             init_database()
             st.success("데이터베이스 초기화 완료! (테이블 재생성)")
-            st.info("💡 수집된 내용을 삭제하려면 '수집 내용 관리' 탭을 사용하세요.")
         except Exception as e:
             st.error(f"오류 발생: {e}")
+
+# 기본값 (트랜드 레이더)
+else:
+    st.header("📰 트랜드 레이더")
+    st.info("좌측 사이드바에서 메뉴를 선택하세요.")

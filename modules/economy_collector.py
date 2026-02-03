@@ -34,27 +34,44 @@ def fetch_bok_reports(max_results: int = 10) -> List[Dict]:
     reports = []
     try:
         # Google News RSS를 통한 한국은행 관련 뉴스 수집
-        rss_url = "https://news.google.com/rss/search?q=한국은행+경제+금리+통화정책&hl=ko&gl=KR&ceid=KR:ko"
+        import urllib.parse
+        query = urllib.parse.quote("한국은행 OR BOK OR 한국은행 금리 OR 한국은행 통화정책")
+        rss_url = f"https://news.google.com/rss/search?q={query}&hl=ko&gl=KR&ceid=KR:ko"
         
         feed = feedparser.parse(rss_url)
         
+        if not feed.entries:
+            logger.warning(f"한국은행 RSS 피드가 비어있음: {feed.get('bozo_exception', 'Unknown error')}")
+            # 대체 방법: 더 간단한 검색어 사용
+            rss_url = "https://news.google.com/rss/search?q=한국은행&hl=ko&gl=KR&ceid=KR:ko"
+            feed = feedparser.parse(rss_url)
+        
         for entry in feed.entries[:max_results]:
-            title = entry.get("title", "").replace(" - Google 뉴스", "").strip()
+            title = entry.get("title", "").replace(" - Google 뉴스", "").replace(" - Google News", "").strip()
             url = entry.get("link", "")
             
             if title and url:
+                # 날짜 파싱
+                try:
+                    from dateutil import parser as date_parser
+                    pub_date = date_parser.parse(entry.get("published", "")).strftime("%Y-%m-%d")
+                except:
+                    pub_date = datetime.now().strftime("%Y-%m-%d")
+                
                 reports.append({
                     "title": title,
                     "url": url,
                     "source": "한국은행 (Google News)",
                     "category": "거시경제",
-                    "date": entry.get("published", datetime.now().strftime("%Y-%m-%d"))
+                    "date": pub_date
                 })
         
         logger.info(f"한국은행 관련 뉴스 {len(reports)}개 수집")
         
     except Exception as e:
         logger.error(f"한국은행 뉴스 수집 실패: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
     
     return reports
 
@@ -67,27 +84,42 @@ def fetch_kdi_reports(max_results: int = 10) -> List[Dict]:
     reports = []
     try:
         # Google News RSS를 통한 KDI 관련 뉴스 수집
-        rss_url = "https://news.google.com/rss/search?q=KDI+한국개발연구원+경제동향&hl=ko&gl=KR&ceid=KR:ko"
+        import urllib.parse
+        query = urllib.parse.quote("KDI OR 한국개발연구원")
+        rss_url = f"https://news.google.com/rss/search?q={query}&hl=ko&gl=KR&ceid=KR:ko"
         
         feed = feedparser.parse(rss_url)
         
+        if not feed.entries:
+            logger.warning(f"KDI RSS 피드가 비어있음")
+            rss_url = "https://news.google.com/rss/search?q=KDI&hl=ko&gl=KR&ceid=KR:ko"
+            feed = feedparser.parse(rss_url)
+        
         for entry in feed.entries[:max_results]:
-            title = entry.get("title", "").replace(" - Google 뉴스", "").strip()
+            title = entry.get("title", "").replace(" - Google 뉴스", "").replace(" - Google News", "").strip()
             url = entry.get("link", "")
             
             if title and url:
+                try:
+                    from dateutil import parser as date_parser
+                    pub_date = date_parser.parse(entry.get("published", "")).strftime("%Y-%m-%d")
+                except:
+                    pub_date = datetime.now().strftime("%Y-%m-%d")
+                
                 reports.append({
                     "title": title,
                     "url": url,
                     "source": "KDI (Google News)",
                     "category": "거시경제",
-                    "date": entry.get("published", datetime.now().strftime("%Y-%m-%d"))
+                    "date": pub_date
                 })
         
         logger.info(f"KDI 관련 뉴스 {len(reports)}개 수집")
         
     except Exception as e:
         logger.error(f"KDI 뉴스 수집 실패: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
     
     return reports
 
@@ -95,30 +127,47 @@ def fetch_kdi_reports(max_results: int = 10) -> List[Dict]:
 def fetch_hankyung_consensus(max_results: int = 20) -> List[Dict]:
     """
     한경 컨센서스 리포트 수집
-    
-    Returns:
-        리포트 딕셔너리 리스트
+    Google News를 통해 한경 관련 뉴스 수집
     """
     reports = []
     try:
-        # 한경 컨센서스 RSS Feed
-        rss_url = "https://consensus.hankyung.com/rss"
+        # Google News RSS를 통한 한경 관련 뉴스 수집
+        import urllib.parse
+        query = urllib.parse.quote("한경 OR 한경컨센서스 OR 한경증권")
+        rss_url = f"https://news.google.com/rss/search?q={query}&hl=ko&gl=KR&ceid=KR:ko"
         
         feed = feedparser.parse(rss_url)
         
+        if not feed.entries:
+            logger.warning(f"한경 RSS 피드가 비어있음")
+            rss_url = "https://news.google.com/rss/search?q=한경&hl=ko&gl=KR&ceid=KR:ko"
+            feed = feedparser.parse(rss_url)
+        
         for entry in feed.entries[:max_results]:
-            reports.append({
-                "title": entry.get("title", ""),
-                "url": entry.get("link", ""),
-                "source": "한경 컨센서스",
-                "category": "산업분석",
-                "date": entry.get("published", datetime.now().strftime("%Y-%m-%d"))
-            })
+            title = entry.get("title", "").replace(" - Google 뉴스", "").replace(" - Google News", "").strip()
+            url = entry.get("link", "")
+            
+            if title and url:
+                try:
+                    from dateutil import parser as date_parser
+                    pub_date = date_parser.parse(entry.get("published", "")).strftime("%Y-%m-%d")
+                except:
+                    pub_date = datetime.now().strftime("%Y-%m-%d")
+                
+                reports.append({
+                    "title": title,
+                    "url": url,
+                    "source": "한경 컨센서스 (Google News)",
+                    "category": "산업분석",
+                    "date": pub_date
+                })
         
         logger.info(f"한경 컨센서스 {len(reports)}개 수집")
         
     except Exception as e:
         logger.error(f"한경 컨센서스 수집 실패: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
     
     return reports
 
@@ -126,32 +175,47 @@ def fetch_hankyung_consensus(max_results: int = 20) -> List[Dict]:
 def fetch_naver_finance(max_results: int = 20) -> List[Dict]:
     """
     네이버 금융 리서치 수집
-    Google News RSS를 통해 네이버 금융 관련 뉴스 수집
+    Google News RSS를 통해 경제/금융 뉴스 수집
     """
     reports = []
     try:
-        # Google News RSS를 통한 네이버 금융 관련 뉴스 수집
-        rss_url = "https://news.google.com/rss/search?q=네이버+금융+경제+증권+시장&hl=ko&gl=KR&ceid=KR:ko"
+        # Google News RSS를 통한 경제/금융 뉴스 수집
+        import urllib.parse
+        query = urllib.parse.quote("경제 OR 금융 OR 증권 OR 시장")
+        rss_url = f"https://news.google.com/rss/search?q={query}&hl=ko&gl=KR&ceid=KR:ko"
         
         feed = feedparser.parse(rss_url)
         
+        if not feed.entries:
+            logger.warning(f"네이버 금융 RSS 피드가 비어있음")
+            rss_url = "https://news.google.com/rss/search?q=경제&hl=ko&gl=KR&ceid=KR:ko"
+            feed = feedparser.parse(rss_url)
+        
         for entry in feed.entries[:max_results]:
-            title = entry.get("title", "").replace(" - Google 뉴스", "").strip()
+            title = entry.get("title", "").replace(" - Google 뉴스", "").replace(" - Google News", "").strip()
             url = entry.get("link", "")
             
             if title and url:
+                try:
+                    from dateutil import parser as date_parser
+                    pub_date = date_parser.parse(entry.get("published", "")).strftime("%Y-%m-%d")
+                except:
+                    pub_date = datetime.now().strftime("%Y-%m-%d")
+                
                 reports.append({
                     "title": title,
                     "url": url,
                     "source": "네이버 금융 (Google News)",
                     "category": "산업분석",
-                    "date": entry.get("published", datetime.now().strftime("%Y-%m-%d"))
+                    "date": pub_date
                 })
         
         logger.info(f"네이버 금융 관련 뉴스 {len(reports)}개 수집")
         
     except Exception as e:
         logger.error(f"네이버 금융 수집 실패: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
     
     return reports
 
@@ -164,27 +228,42 @@ def fetch_investing_news(max_results: int = 20) -> List[Dict]:
     news_list = []
     try:
         # Google News RSS를 통한 글로벌 경제 뉴스 수집
-        rss_url = "https://news.google.com/rss/search?q=economy+fed+rate+gdp+inflation+market&hl=en&gl=US&ceid=US:en"
+        import urllib.parse
+        query = urllib.parse.quote("economy OR fed OR rate OR gdp OR inflation OR market")
+        rss_url = f"https://news.google.com/rss/search?q={query}&hl=en&gl=US&ceid=US:en"
         
         feed = feedparser.parse(rss_url)
+        
+        if not feed.entries:
+            logger.warning(f"글로벌 경제 RSS 피드가 비어있음")
+            rss_url = "https://news.google.com/rss/search?q=economy&hl=en&gl=US&ceid=US:en"
+            feed = feedparser.parse(rss_url)
         
         for entry in feed.entries[:max_results]:
             title = entry.get("title", "").replace(" - Google News", "").strip()
             url = entry.get("link", "")
             
             if title and url:
+                try:
+                    from dateutil import parser as date_parser
+                    pub_date = date_parser.parse(entry.get("published", "")).strftime("%Y-%m-%d")
+                except:
+                    pub_date = datetime.now().strftime("%Y-%m-%d")
+                
                 news_list.append({
                     "title": title,
                     "url": url,
                     "source": "Investing.com (Google News)",
                     "category": "글로벌시황",
-                    "date": entry.get("published", datetime.now().strftime("%Y-%m-%d"))
+                    "date": pub_date
                 })
         
         logger.info(f"글로벌 경제 뉴스 {len(news_list)}개 수집")
         
     except Exception as e:
         logger.error(f"글로벌 경제 뉴스 수집 실패: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
     
     return news_list
 
@@ -197,33 +276,47 @@ def fetch_daily_economy_news(max_results: int = 30) -> List[Dict]:
     news_list = []
     try:
         # Google News RSS를 통한 일일 경제 뉴스 수집
-        keywords = ["경제", "금리", "통화정책", "GDP", "인플레이션", "증시", "환율", "부동산", "고용"]
+        import urllib.parse
+        keywords = ["경제", "금리", "통화정책"]
         today = datetime.now().strftime("%Y-%m-%d")
         
-        for keyword in keywords[:3]:  # 상위 3개 키워드만 사용
-            rss_url = f"https://news.google.com/rss/search?q={keyword}&hl=ko&gl=KR&ceid=KR:ko&when:1d"
+        for keyword in keywords:
+            query = urllib.parse.quote(keyword)
+            rss_url = f"https://news.google.com/rss/search?q={query}&hl=ko&gl=KR&ceid=KR:ko"
             
             feed = feedparser.parse(rss_url)
             
-            for entry in feed.entries[:max_results//3]:
-                title = entry.get("title", "").replace(" - Google 뉴스", "").strip()
+            if not feed.entries:
+                logger.warning(f"{keyword} RSS 피드가 비어있음")
+                continue
+            
+            for entry in feed.entries[:max_results//len(keywords)]:
+                title = entry.get("title", "").replace(" - Google 뉴스", "").replace(" - Google News", "").strip()
                 url = entry.get("link", "")
                 
                 if title and url and title not in [n.get("title") for n in news_list]:
+                    try:
+                        from dateutil import parser as date_parser
+                        pub_date = date_parser.parse(entry.get("published", "")).strftime("%Y-%m-%d")
+                    except:
+                        pub_date = today
+                    
                     news_list.append({
                         "title": title,
                         "url": url,
                         "source": "일일 경제 뉴스",
                         "category": "거시경제",
-                        "date": entry.get("published", today)
+                        "date": pub_date
                     })
             
-            time.sleep(0.2)  # API 호출 간격
+            time.sleep(0.3)  # API 호출 간격
         
         logger.info(f"일일 경제 뉴스 {len(news_list)}개 수집")
         
     except Exception as e:
         logger.error(f"일일 경제 뉴스 수집 실패: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
     
     return news_list
 
@@ -236,27 +329,42 @@ def fetch_kcif_news(max_results: int = 20) -> List[Dict]:
     news_list = []
     try:
         # Google News RSS를 통한 국제금융센터 관련 뉴스 수집
-        rss_url = "https://news.google.com/rss/search?q=국제금융센터+KCIF+글로벌+금융&hl=ko&gl=KR&ceid=KR:ko"
+        import urllib.parse
+        query = urllib.parse.quote("국제금융센터 OR KCIF OR 글로벌 금융")
+        rss_url = f"https://news.google.com/rss/search?q={query}&hl=ko&gl=KR&ceid=KR:ko"
         
         feed = feedparser.parse(rss_url)
         
+        if not feed.entries:
+            logger.warning(f"국제금융센터 RSS 피드가 비어있음")
+            rss_url = "https://news.google.com/rss/search?q=글로벌+금융&hl=ko&gl=KR&ceid=KR:ko"
+            feed = feedparser.parse(rss_url)
+        
         for entry in feed.entries[:max_results]:
-            title = entry.get("title", "").replace(" - Google 뉴스", "").strip()
+            title = entry.get("title", "").replace(" - Google 뉴스", "").replace(" - Google News", "").strip()
             url = entry.get("link", "")
             
             if title and url:
+                try:
+                    from dateutil import parser as date_parser
+                    pub_date = date_parser.parse(entry.get("published", "")).strftime("%Y-%m-%d")
+                except:
+                    pub_date = datetime.now().strftime("%Y-%m-%d")
+                
                 news_list.append({
                     "title": title,
                     "url": url,
                     "source": "국제금융센터 (Google News)",
                     "category": "글로벌시황",
-                    "date": entry.get("published", datetime.now().strftime("%Y-%m-%d"))
+                    "date": pub_date
                 })
         
         logger.info(f"국제금융센터 관련 뉴스 {len(news_list)}개 수집")
         
     except Exception as e:
         logger.error(f"국제금융센터 뉴스 수집 실패: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
     
     return news_list
 
@@ -477,8 +585,15 @@ def collect_economy_news(progress_callback=None):
     processed_count = 0
     
     logger.info(f"총 {total_work}개 항목 수집 완료. 병렬 처리 시작...")
+    
+    if total_work == 0:
+        logger.warning("수집된 항목이 없습니다. RSS 피드 확인이 필요합니다.")
+        if progress_callback:
+            progress_callback(6, 6, "수집된 항목이 없습니다.")
+        return 0, 0
+    
     if progress_callback:
-        progress_callback(4, 6, f"항목 분석 준비 중...")
+        progress_callback(4, 6, f"항목 분석 준비 중... ({total_work}개 항목)")
     
     # 병렬 처리 (최대 5개 스레드 동시 실행)
     with ThreadPoolExecutor(max_workers=5) as executor:

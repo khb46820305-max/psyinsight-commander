@@ -141,6 +141,32 @@ def generate_summary(text: str, max_retries: int = 3) -> str:
 {text}
 
 요약:"""
+    
+    for attempt in range(max_retries):
+        try:
+            model = get_model()
+            response = model.generate_content(
+                prompt,
+                generation_config={
+                    "temperature": 0.3,
+                    "max_output_tokens": 300,
+                }
+            )
+            summary = response.text.strip()
+            if summary and len(summary) > 10:  # 최소 길이 체크
+                logger.info("요약 생성 완료")
+                return summary
+            else:
+                raise ValueError("요약이 너무 짧거나 비어있습니다.")
+        except Exception as e:
+            logger.warning(f"요약 생성 실패 (시도 {attempt + 1}/{max_retries}): {e}")
+            if attempt == max_retries - 1:
+                # 텍스트의 첫 부분을 요약으로 사용
+                lines = text.split('\n')[:3]
+                fallback_summary = ' '.join([line.strip() for line in lines if line.strip()])[:200]
+                return fallback_summary if fallback_summary else "요약을 생성할 수 없습니다."
+            import time
+            time.sleep(2 ** attempt)  # 지수 백오프
 
 
 def generate_news_summary_korean(text: str, max_retries: int = 3) -> str:

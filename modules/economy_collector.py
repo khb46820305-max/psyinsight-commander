@@ -628,3 +628,143 @@ def collect_economy_news(progress_callback=None):
     
     logger.info(f"=== 경제 흐름 정보 수집 완료: {total_collected}개 수집, {total_saved}개 저장 ===")
     return total_collected, total_saved
+
+
+def generate_daily_economy_report(date: str = None) -> Optional[str]:
+    """
+    일일 경제 종합 보고서 생성
+    수집된 모든 경제 뉴스를 종합하여 하나의 보고서로 작성
+    
+    Args:
+        date: 보고서 날짜 (None이면 오늘 날짜)
+    
+    Returns:
+        종합 보고서 텍스트 (실패 시 None)
+    """
+    if date is None:
+        date = datetime.now().strftime("%Y-%m-%d")
+    
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        
+        # 해당 날짜의 모든 경제 뉴스 조회
+        cursor.execute("""
+            SELECT title, content_summary, category, source, keywords
+            FROM economy_news
+            WHERE date = ?
+            ORDER BY created_at DESC
+        """, (date,))
+        
+        all_news = cursor.fetchall()
+        conn.close()
+        
+        if not all_news:
+            logger.warning(f"{date} 날짜의 경제 뉴스가 없습니다.")
+            return None
+        
+        logger.info(f"{date} 날짜의 경제 뉴스 {len(all_news)}개를 종합하여 보고서 생성 중...")
+        
+        # 뉴스 데이터를 카테고리별로 분류
+        macro_economy = []  # 거시경제
+        industry_analysis = []  # 산업분석
+        global_market = []  # 글로벌시황
+        
+        for news in all_news:
+            title, summary, category, source, keywords_json = news
+            try:
+                keywords = json.loads(keywords_json) if keywords_json else []
+            except:
+                keywords = []
+            
+            news_item = {
+                "title": title,
+                "summary": summary or title,
+                "source": source,
+                "keywords": keywords
+            }
+            
+            if category == "거시경제":
+                macro_economy.append(news_item)
+            elif category == "산업분석":
+                industry_analysis.append(news_item)
+            elif category == "글로벌시황":
+                global_market.append(news_item)
+        
+        # AI를 사용하여 종합 보고서 생성
+        report_prompt = f"""다음은 {date} 날짜에 수집된 경제 뉴스 정보입니다. 이를 종합하여 일일 경제 종합 보고서를 작성해주세요.
+
+## 수집된 뉴스 정보
+
+### 1. 거시경제 ({len(macro_economy)}건)
+"""
+        
+        for idx, news in enumerate(macro_economy[:10], 1):  # 최대 10개만 사용
+            report_prompt += f"""
+{idx}. [{news['source']}] {news['title']}
+   요약: {news['summary'][:200]}
+"""
+        
+        report_prompt += f"""
+### 2. 산업분석 ({len(industry_analysis)}건)
+"""
+        
+        for idx, news in enumerate(industry_analysis[:10], 1):
+            report_prompt += f"""
+{idx}. [{news['source']}] {news['title']}
+   요약: {news['summary'][:200]}
+"""
+        
+        report_prompt += f"""
+### 3. 글로벌시황 ({len(global_market)}건)
+"""
+        
+        for idx, news in enumerate(global_market[:10], 1):
+            report_prompt += f"""
+{idx}. [{news['source']}] {news['title']}
+   요약: {news['summary'][:200]}
+"""
+        
+        report_prompt += """
+## 보고서 작성 지침
+
+위 정보를 바탕으로 다음 형식으로 일일 경제 종합 보고서를 작성해주세요:
+
+1. **보고서 제목**: 날짜와 함께 명확한 제목
+2. **요약**: 전체 경제 동향을 한눈에 파악할 수 있는 3-4줄 요약
+3. **주요 이슈**: 가장 중요한 경제 이슈 3-5개를 선별하여 설명
+4. **카테고리별 분석**:
+   - 거시경제: 금리, 통화정책, GDP, 인플레이션 등
+   - 산업분석: 주요 산업 동향, 기업 분석 등
+   - 글로벌시황: 해외 경제 동향, 환율, 국제 금융 등
+5. **시사점**: 오늘의 경제 뉴스가 시사하는 바와 향후 전망
+
+중복되는 내용은 제거하고, 관련된 내용은 연합시켜 일목요연하게 정리해주세요.
+"""
+        
+        # AI 모델을 사용하여 보고서 생성
+        try:
+            model = get_model()
+            response = model.generate_content(
+                report_prompt,
+                generation_config={
+                    "temperature": 0.7,
+                    "max_output_tokens": 3000,
+                }
+            )
+            
+            report = response.text.strip()
+            logger.info(f"일일 경제 종합 보고서 생성 완료: {len(report)}자")
+            return report
+            
+        except Exception as e:
+            logger.error(f"보고서 생성 실패: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return None
+            
+    except Exception as e:
+        logger.error(f"보고서 생성 중 오류 발생: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return None

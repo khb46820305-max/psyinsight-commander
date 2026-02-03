@@ -1211,6 +1211,7 @@ elif selected_menu == "🧪 테스트":
                         st.markdown(f"**{title}**")
                     st.markdown(f"📅 {date} | 🌍 {country} | ⭐ {rating}/5")
                     if summary:
+                        # 요약 전체 표시 (150자 제한 제거)
                         st.markdown(f"**요약:** {summary}")
                     if url:
                         st.markdown(f"[원문 보기 →]({url})")

@@ -304,8 +304,21 @@ def process_single_paper(paper: Dict) -> Optional[Dict]:
     
     # 데이터베이스에 저장
     # Abstract에 번역 병기 (외국 논문인 경우)
-    if is_foreign and abstract_translated and abstract_translated != abstract and len(abstract_translated) > 50:
-        abstract_display = f"[원문]\n{abstract[:2000]}\n\n[한국어 번역]\n{abstract_translated[:2000]}"
+    # 번역이 성공했는지 확인 (원문과 다르고, 길이가 충분하고, 한글이 포함되어 있는지)
+    if is_foreign and abstract_translated:
+        # 번역 성공 여부 확인: 원문과 다르고, 한글이 포함되어 있고, 길이가 충분한지
+        has_korean = any('\uac00' <= char <= '\ud7a3' for char in abstract_translated)
+        is_translated = (abstract_translated != abstract and 
+                        len(abstract_translated) > 50 and 
+                        has_korean)
+        
+        if is_translated:
+            abstract_display = f"[원문]\n{abstract[:2000]}\n\n[한국어 번역]\n{abstract_translated[:2000]}"
+            logger.info(f"Abstract 번역 병기 완료: 원문 {len(abstract)}자, 번역 {len(abstract_translated)}자")
+        else:
+            # 번역 실패 시 원문만 저장하되, 로그 기록
+            abstract_display = abstract
+            logger.warning(f"Abstract 번역 실패 또는 불완전: 원문과 동일하거나 한글 미포함")
     else:
         abstract_display = abstract
     

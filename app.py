@@ -5,6 +5,16 @@ PsyInsight Commander - 메인 Streamlit 애플리케이션
 
 import streamlit as st
 
+# 세션 상태 초기화
+if 'scroll_to_top' not in st.session_state:
+    st.session_state.scroll_to_top = False
+if 'scroll_to_top_tab2' not in st.session_state:
+    st.session_state.scroll_to_top_tab2 = False
+if 'scroll_to_top_tab3' not in st.session_state:
+    st.session_state.scroll_to_top_tab3 = False
+if 'scroll_to_top_tab4' not in st.session_state:
+    st.session_state.scroll_to_top_tab4 = False
+
 # 페이지 설정
 st.set_page_config(
     page_title="PsyInsight Commander",

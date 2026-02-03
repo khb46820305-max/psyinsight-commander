@@ -1147,15 +1147,27 @@ elif selected_menu == "🧪 테스트":
             if saved_papers > 0:
                 conn = get_connection()
                 cursor = conn.cursor()
-                cursor.execute("""
-                    SELECT id, title, date, journal, url, abstract, keywords
-                    FROM papers
-                    WHERE journal LIKE '%arXiv%' OR url LIKE '%arxiv%'
-                    ORDER BY created_at DESC
-                    LIMIT 2
-                """)
-                test_results["papers"] = cursor.fetchall()
-                conn.close()
+                try:
+                    cursor.execute("""
+                        SELECT id, title, date, journal, url, abstract, keywords
+                        FROM papers
+                        WHERE (journal LIKE '%arXiv%' OR journal LIKE '%arxiv%' OR url LIKE '%arxiv%')
+                        ORDER BY created_at DESC
+                        LIMIT 2
+                    """)
+                    test_results["papers"] = cursor.fetchall()
+                except Exception as e:
+                    # 에러 발생 시 더 간단한 쿼리로 재시도
+                    logger.error(f"논문 조회 실패: {e}")
+                    cursor.execute("""
+                        SELECT id, title, date, journal, url, abstract, keywords
+                        FROM papers
+                        ORDER BY created_at DESC
+                        LIMIT 2
+                    """)
+                    test_results["papers"] = cursor.fetchall()
+                finally:
+                    conn.close()
             
             progress_bar.progress(1.0)
             status_text.text("✅ 테스트 수집 완료!")

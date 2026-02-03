@@ -1089,9 +1089,9 @@ elif selected_menu == "🧪 테스트":
             status_text.text("한국 뉴스 수집 중... (1/4)")
             progress_bar.progress(0.1)
             collected_kr, saved_kr = collect_and_analyze_news(
-                keywords=["심리건강"],
+                keywords=["심리건강", "심리상담", "정신건강", "마음건강"],
                 countries=["KR"],
-                max_per_keyword=1,
+                max_per_keyword=5,  # 더 많이 가져와서 필터링 후 저장
                 progress_callback=update_progress
             )
             
@@ -1113,9 +1113,9 @@ elif selected_menu == "🧪 테스트":
             status_text.text("외국 뉴스 수집 중... (2/4)")
             progress_bar.progress(0.3)
             collected_us, saved_us = collect_and_analyze_news(
-                keywords=["mental health"],
+                keywords=["mental health", "psychology", "counseling"],
                 countries=["US"],
-                max_per_keyword=1,
+                max_per_keyword=5,  # 더 많이 가져와서 필터링 후 저장
                 progress_callback=update_progress
             )
             
@@ -1214,7 +1214,24 @@ elif selected_menu == "🧪 테스트":
                     st.markdown(f"📅 {date} | 📖 {journal}")
                     if abstract:
                         with st.expander("📄 Abstract"):
-                            st.markdown(abstract[:500] + "..." if len(abstract) > 500 else abstract)
+                            # Abstract에 번역이 포함되어 있는지 확인
+                            if "[원문]" in abstract and "[한국어 번역]" in abstract:
+                                # 외국 논문: 원문과 번역 분리 표시
+                                parts = abstract.split("[한국어 번역]")
+                                if len(parts) == 2:
+                                    original = parts[0].replace("[원문]", "").strip()
+                                    translated = parts[1].strip()
+                                    st.markdown("**📄 원본 Abstract (영문):**")
+                                    st.markdown(f"<p style='font-size: 12px; line-height: 1.6;'>{original}</p>", unsafe_allow_html=True)
+                                    st.markdown("---")
+                                    st.markdown("**🇰🇷 한국어 번역:**")
+                                    st.markdown(f"<p style='font-size: 12px; line-height: 1.6;'>{translated}</p>", unsafe_allow_html=True)
+                                else:
+                                    st.markdown(f"<p style='font-size: 12px; line-height: 1.6;'>{abstract}</p>", unsafe_allow_html=True)
+                            else:
+                                # 한국 논문: 원문만 표시
+                                st.markdown("**📄 논문 Abstract:**")
+                                st.markdown(f"<p style='font-size: 12px; line-height: 1.6;'>{abstract}</p>", unsafe_allow_html=True)
                     if url:
                         st.markdown(f"[원문 보기 →]({url})")
                     st.markdown("---")

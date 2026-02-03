@@ -512,6 +512,161 @@ with tab3:
                 except Exception as e:
                     st.error(f"콘텐츠 생성 실패: {e}")
 
+# Tab 4: 수집 내용 관리
+with tab4:
+    st.header("🗑️ 수집 내용 관리")
+    st.markdown("수집된 뉴스와 논문을 선택하여 삭제할 수 있습니다.")
+    
+    st.divider()
+    
+    # 뉴스 삭제 섹션
+    st.subheader("📰 뉴스 삭제")
+    try:
+        from modules.database import get_connection
+        import json
+        
+        conn = get_connection()
+        cursor = conn.cursor()
+        
+        # 뉴스 목록 조회
+        cursor.execute("""
+            SELECT id, date, title, url, country, validity_score
+            FROM articles
+            ORDER BY created_at DESC
+        """)
+        news_items = cursor.fetchall()
+        conn.close()
+        
+        if news_items:
+            st.markdown(f"**총 {len(news_items)}개의 뉴스가 있습니다.**")
+            
+            # 체크박스로 선택
+            selected_news_ids = []
+            for item in news_items:
+                news_id, date, title, url, country, score = item
+                checkbox_key = f"news_delete_{news_id}"
+                if st.checkbox(
+                    f"📰 [{country}] {title[:60]}{'...' if len(title) > 60 else ''} | ⭐{score}/5 | {date}",
+                    key=checkbox_key
+                ):
+                    selected_news_ids.append(news_id)
+            
+            # 삭제 버튼
+            if selected_news_ids:
+                st.warning(f"⚠️ {len(selected_news_ids)}개의 뉴스를 삭제하시겠습니까?")
+                col1, col2 = st.columns([1, 1])
+                with col1:
+                    if st.button("✅ 선택한 뉴스 삭제", type="primary", key="delete_news_btn"):
+                        try:
+                            conn = get_connection()
+                            cursor = conn.cursor()
+                            placeholders = ",".join(["?" for _ in selected_news_ids])
+                            cursor.execute(f"DELETE FROM articles WHERE id IN ({placeholders})", selected_news_ids)
+                            conn.commit()
+                            conn.close()
+                            st.success(f"✅ {len(selected_news_ids)}개의 뉴스가 삭제되었습니다.")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"❌ 삭제 중 오류 발생: {e}")
+                with col2:
+                    if st.button("❌ 취소", key="cancel_news_btn"):
+                        st.rerun()
+        else:
+            st.info("📭 삭제할 뉴스가 없습니다.")
+            
+    except Exception as e:
+        st.error(f"뉴스 조회 오류: {e}")
+    
+    st.divider()
+    
+    # 논문 삭제 섹션
+    st.subheader("📚 논문 삭제")
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        
+        # 논문 목록 조회
+        cursor.execute("""
+            SELECT id, date, title, journal, category
+            FROM papers
+            ORDER BY created_at DESC
+        """)
+        paper_items = cursor.fetchall()
+        conn.close()
+        
+        if paper_items:
+            st.markdown(f"**총 {len(paper_items)}개의 논문이 있습니다.**")
+            
+            # 체크박스로 선택
+            selected_paper_ids = []
+            for item in paper_items:
+                paper_id, date, title, journal, category = item
+                checkbox_key = f"paper_delete_{paper_id}"
+                if st.checkbox(
+                    f"📚 [{journal}] {title[:60]}{'...' if len(title) > 60 else ''} | {date}",
+                    key=checkbox_key
+                ):
+                    selected_paper_ids.append(paper_id)
+            
+            # 삭제 버튼
+            if selected_paper_ids:
+                st.warning(f"⚠️ {len(selected_paper_ids)}개의 논문을 삭제하시겠습니까?")
+                col1, col2 = st.columns([1, 1])
+                with col1:
+                    if st.button("✅ 선택한 논문 삭제", type="primary", key="delete_paper_btn"):
+                        try:
+                            conn = get_connection()
+                            cursor = conn.cursor()
+                            placeholders = ",".join(["?" for _ in selected_paper_ids])
+                            cursor.execute(f"DELETE FROM papers WHERE id IN ({placeholders})", selected_paper_ids)
+                            conn.commit()
+                            conn.close()
+                            st.success(f"✅ {len(selected_paper_ids)}개의 논문이 삭제되었습니다.")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"❌ 삭제 중 오류 발생: {e}")
+                with col2:
+                    if st.button("❌ 취소", key="cancel_paper_btn"):
+                        st.rerun()
+        else:
+            st.info("📭 삭제할 논문이 없습니다.")
+            
+    except Exception as e:
+        st.error(f"논문 조회 오류: {e}")
+    
+    st.divider()
+    
+    # 전체 삭제 섹션
+    st.subheader("⚠️ 전체 삭제")
+    st.warning("⚠️ 모든 뉴스와 논문을 삭제합니다. 이 작업은 되돌릴 수 없습니다!")
+    
+    col1, col2 = st.columns([1, 1])
+    with col1:
+        if st.button("🗑️ 모든 뉴스 삭제", type="secondary", key="delete_all_news_btn"):
+            try:
+                conn = get_connection()
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM articles")
+                conn.commit()
+                conn.close()
+                st.success("✅ 모든 뉴스가 삭제되었습니다.")
+                st.rerun()
+            except Exception as e:
+                st.error(f"❌ 삭제 중 오류 발생: {e}")
+    
+    with col2:
+        if st.button("🗑️ 모든 논문 삭제", type="secondary", key="delete_all_paper_btn"):
+            try:
+                conn = get_connection()
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM papers")
+                conn.commit()
+                conn.close()
+                st.success("✅ 모든 논문이 삭제되었습니다.")
+                st.rerun()
+            except Exception as e:
+                st.error(f"❌ 삭제 중 오류 발생: {e}")
+
 # 사이드바
 with st.sidebar:
     st.header("⚙️ 설정")
@@ -522,6 +677,7 @@ with st.sidebar:
         try:
             from modules.database import init_database
             init_database()
-            st.success("데이터베이스 초기화 완료!")
+            st.success("데이터베이스 초기화 완료! (테이블 재생성)")
+            st.info("💡 수집된 내용을 삭제하려면 '수집 내용 관리' 탭을 사용하세요.")
         except Exception as e:
             st.error(f"오류 발생: {e}")

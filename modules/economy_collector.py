@@ -277,7 +277,9 @@ def fetch_daily_economy_news(max_results: int = 30) -> List[Dict]:
     try:
         # Google News RSS를 통한 일일 경제 뉴스 수집
         import urllib.parse
-        keywords = ["경제", "금리", "통화정책"]
+        # 경제 뉴스 키워드 (개선: 산업별, 기업 분석 키워드 추가)
+        keywords = ["경제", "금리", "통화정책", "증시", "주식", "경제동향", "거시경제", "실물경제", "부동산", "경제정책",
+                   "반도체", "바이오", "금융", "은행", "증권", "경제지표"]
         today = datetime.now().strftime("%Y-%m-%d")
         
         for keyword in keywords:

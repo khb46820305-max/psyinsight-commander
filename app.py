@@ -86,8 +86,153 @@ with st.sidebar:
             st.error(f"오류 발생: {e}")
 
 # 메인 콘텐츠 영역
+# 0. 통합 대시보드
+if selected_menu == "🏠 대시보드":
+    st.header("🏠 통합 대시보드")
+    st.markdown("전체 프로젝트의 주요 인사이트를 한눈에 확인합니다.")
+    
+    try:
+        from modules.database import get_connection
+        from datetime import datetime, timedelta
+        import json
+        from collections import Counter
+        import pandas as pd
+        
+        conn = get_connection()
+        cursor = conn.cursor()
+        
+        # 오늘의 주요 이슈 (뉴스 + 논문 통합)
+        st.subheader("🔥 오늘의 주요 이슈")
+        
+        end_date = datetime.now().strftime("%Y-%m-%d")
+        
+        # 오늘 수집된 뉴스
+        cursor.execute("""
+            SELECT title, url, date, keywords FROM articles
+            WHERE date = ?
+            ORDER BY created_at DESC
+            LIMIT 10
+        """, (end_date,))
+        today_news = cursor.fetchall()
+        
+        # 오늘 수집된 논문
+        cursor.execute("""
+            SELECT title, url, date, keywords FROM papers
+            WHERE date = ?
+            ORDER BY created_at DESC
+            LIMIT 10
+        """, (end_date,))
+        today_papers = cursor.fetchall()
+        
+        if today_news or today_papers:
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.markdown("**📰 오늘의 뉴스**")
+                for title, url, date, _ in today_news[:5]:
+                    st.markdown(f"- [{title[:50]}{'...' if len(title) > 50 else ''}]({url})")
+            
+            with col2:
+                st.markdown("**📚 오늘의 논문**")
+                for title, url, date, _ in today_papers[:5]:
+                    st.markdown(f"- [{title[:50]}{'...' if len(title) > 50 else ''}]({url})")
+        else:
+            st.info("📭 오늘 수집된 내용이 없습니다.")
+        
+        st.divider()
+        
+        # 최근 7일 트렌드
+        st.subheader("📈 최근 7일 트렌드")
+        
+        start_date = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
+        
+        # 날짜별 뉴스/논문 개수
+        cursor.execute("""
+            SELECT date, COUNT(*) FROM articles
+            WHERE date >= ?
+            GROUP BY date
+            ORDER BY date
+        """, (start_date,))
+        news_trend = {date: count for date, count in cursor.fetchall()}
+        
+        cursor.execute("""
+            SELECT date, COUNT(*) FROM papers
+            WHERE date >= ?
+            GROUP BY date
+            ORDER BY date
+        """, (start_date,))
+        paper_trend = {date: count for date, count in cursor.fetchall()}
+        
+        # 트렌드 데이터프레임 생성
+        trend_dates = []
+        news_counts = []
+        paper_counts = []
+        
+        for i in range(7):
+            date = (datetime.now() - timedelta(days=6-i)).strftime("%Y-%m-%d")
+            trend_dates.append(date)
+            news_counts.append(news_trend.get(date, 0))
+            paper_counts.append(paper_trend.get(date, 0))
+        
+        trend_df = pd.DataFrame({
+            "날짜": trend_dates,
+            "뉴스": news_counts,
+            "논문": paper_counts
+        })
+        
+        if not trend_df.empty:
+            st.line_chart(trend_df.set_index("날짜"))
+        
+        st.divider()
+        
+        # 키워드 클라우드 (상위 키워드)
+        st.subheader("🏷️ 주요 키워드")
+        
+        # 뉴스 키워드
+        cursor.execute("""
+            SELECT keywords FROM articles
+            WHERE date >= ? AND keywords IS NOT NULL
+        """, (start_date,))
+        
+        all_keywords = []
+        for row in cursor.fetchall():
+            try:
+                keywords = json.loads(row[0]) if row[0] else []
+                all_keywords.extend(keywords)
+            except:
+                pass
+        
+        # 논문 키워드
+        cursor.execute("""
+            SELECT keywords FROM papers
+            WHERE date >= ? AND keywords IS NOT NULL
+        """, (start_date,))
+        
+        for row in cursor.fetchall():
+            try:
+                keywords = json.loads(row[0]) if row[0] else []
+                all_keywords.extend(keywords)
+            except:
+                pass
+        
+        keyword_counter = Counter(all_keywords)
+        top_keywords = keyword_counter.most_common(10)
+        
+        if top_keywords:
+            keyword_tags = " ".join([f"`{kw} ({count})`" for kw, count in top_keywords])
+            st.markdown(keyword_tags)
+        else:
+            st.info("📭 키워드 데이터가 없습니다.")
+        
+        conn.close()
+        
+    except Exception as e:
+        st.error(f"❌ 대시보드 로드 실패: {e}")
+        import traceback
+        st.code(traceback.format_exc())
+
 # 1. 트랜드 레이더
-if selected_menu == "📰 트랜드 레이더":
+elif selected_menu == "📰 트랜드 레이더":
     st.header("📰 트랜드 레이더")
     
     # 뉴스 수집 버튼
@@ -108,8 +253,16 @@ if selected_menu == "📰 트랜드 레이더":
                         progress_bar.progress(progress)
                         status_text.text(f"{message} ({current}/{total}) - {int(progress * 100)}%")
                     
+                    # 한국 뉴스 키워드 (개선: 인지행동치료, 정신분석, 집단상담 추가)
+                    kr_keywords = ["정신건강", "심리건강", "마음건강", "심리상담", "심리학이론", "심리학", "정신건강증진", 
+                                   "우울증", "불안장애", "트라우마", "상담심리", "임상심리", "인지행동치료", "정신분석", "집단상담"]
+                    # 미국 뉴스 키워드 (명시적 영어 키워드)
+                    us_keywords = ["mental health", "psychology", "counseling psychology", "clinical psychology", 
+                                   "depression", "anxiety", "trauma", "psychotherapy", "cognitive behavioral therapy", 
+                                   "psychoanalysis", "group therapy", "mental wellness"]
+                    
                     collected, saved = collect_and_analyze_news(
-                        keywords=["정신건강", "심리건강", "마음건강", "심리상담", "심리학이론", "심리학", "정신건강증진", "우울증", "불안장애", "트라우마", "상담심리", "임상심리"],
+                        keywords=kr_keywords + us_keywords,
                         countries=["KR", "US"],
                         max_per_keyword=20,
                         progress_callback=update_progress
@@ -134,8 +287,16 @@ if selected_menu == "📰 트랜드 레이더":
                         progress_bar.progress(progress)
                         status_text.text(f"{message} ({current}/{total}) - {int(progress * 100)}%")
                     
+                    # 한국 뉴스 키워드 (개선: 인지행동치료, 정신분석, 집단상담 추가)
+                    kr_keywords = ["정신건강", "심리건강", "마음건강", "심리상담", "심리학이론", "심리학", "정신건강증진", 
+                                   "우울증", "불안장애", "트라우마", "상담심리", "임상심리", "인지행동치료", "정신분석", "집단상담"]
+                    # 미국 뉴스 키워드 (명시적 영어 키워드)
+                    us_keywords = ["mental health", "psychology", "counseling psychology", "clinical psychology", 
+                                   "depression", "anxiety", "trauma", "psychotherapy", "cognitive behavioral therapy", 
+                                   "psychoanalysis", "group therapy", "mental wellness"]
+                    
                     collected, saved = collect_and_analyze_news(
-                        keywords=["정신건강", "심리건강", "마음건강", "심리상담", "심리학이론", "심리학", "정신건강증진", "우울증", "불안장애", "트라우마", "상담심리", "임상심리"],
+                        keywords=kr_keywords + us_keywords,
                         countries=["KR", "US"],
                         max_per_keyword=10,
                         progress_callback=update_progress
@@ -321,8 +482,13 @@ elif selected_menu == "📚 아카이브":
                         progress_bar.progress(progress)
                         status_text.text(f"{message} ({current}/{total}) - {int(progress * 100)}%")
                     
+                    # 논문 키워드 (개선: 하위 분야 추가, 한국어 키워드 추가)
+                    paper_keywords = ["psychology", "counseling psychology", "clinical psychology", "mental health",
+                                     "cognitive psychology", "developmental psychology", "social psychology",
+                                     "심리학", "상담심리", "인지행동", "정신건강"]
+                    
                     collected, saved = collect_and_analyze_papers(
-                        keywords=["psychology", "counseling psychology", "clinical psychology", "mental health"],
+                        keywords=paper_keywords,
                         sources=["arxiv"],
                         max_per_keyword=10,
                         progress_callback=update_progress
@@ -351,8 +517,13 @@ elif selected_menu == "📚 아카이브":
                         progress_bar.progress(progress)
                         status_text.text(f"{message} ({current}/{total}) - {int(progress * 100)}%")
                     
+                    # 논문 키워드 (개선: 하위 분야 추가, 한국어 키워드 추가)
+                    paper_keywords = ["psychology", "counseling psychology", "clinical psychology", "mental health",
+                                     "cognitive psychology", "developmental psychology", "social psychology",
+                                     "심리학", "상담심리", "인지행동", "정신건강"]
+                    
                     collected, saved = collect_and_analyze_papers(
-                        keywords=["psychology", "counseling psychology", "clinical psychology", "mental health"],
+                        keywords=paper_keywords,
                         sources=["arxiv"],
                         max_per_keyword=10,
                         progress_callback=update_progress
@@ -368,6 +539,34 @@ elif selected_menu == "📚 아카이브":
                     st.error(f"❌ 오류 발생: {e}")
                     import traceback
                     st.code(traceback.format_exc())
+    
+    # 연구 동향 분석
+    st.divider()
+    st.subheader("📊 연구 동향 분석")
+    
+    try:
+        from modules.dashboard_utils import get_paper_trend_data
+        import pandas as pd
+        
+        # 키워드별 트렌드 그래프
+        trend_data = get_paper_trend_data(days=30)
+        
+        if trend_data:
+            # 상위 5개 키워드만 표시
+            top_keywords = sorted(trend_data.items(), key=lambda x: sum(count for _, count in x[1]), reverse=True)[:5]
+            
+            if top_keywords:
+                trend_df = pd.DataFrame({
+                    "날짜": [date for date, _ in top_keywords[0][1]] if top_keywords else [],
+                    **{keyword: [count for _, count in data] for keyword, data in top_keywords}
+                })
+                
+                if not trend_df.empty:
+                    st.line_chart(trend_df.set_index("날짜"))
+        else:
+            st.info("📭 연구 동향 데이터가 없습니다.")
+    except Exception as e:
+        st.error(f"❌ 연구 동향 분석 실패: {e}")
     
     st.divider()
     
@@ -694,6 +893,31 @@ elif selected_menu == "✨ 팩토리":
                     st.markdown(f"**템플릿:** {template}")
                     st.text_area("생성된 콘텐츠", generated_content, height=400, key="generated_content")
                     
+                    # 콘텐츠 저장 기능
+                    col_save1, col_save2 = st.columns([2, 1])
+                    with col_save1:
+                        content_title = st.text_input("제목 (저장용)", value=f"{template} - {datetime.now().strftime('%Y-%m-%d %H:%M')}", key="content_title_input")
+                    with col_save2:
+                        if st.button("💾 저장", key="save_content_btn"):
+                            try:
+                                from modules.database import get_connection
+                                import json
+                                
+                                source_ids = json.dumps([n["id"] for n in selected_news] + [p["id"] for p in selected_papers])
+                                
+                                conn = get_connection()
+                                cursor = conn.cursor()
+                                cursor.execute("""
+                                    INSERT INTO generated_content (content_type, title, content, source_ids)
+                                    VALUES (?, ?, ?, ?)
+                                """, (template, content_title, generated_content, source_ids))
+                                conn.commit()
+                                conn.close()
+                                
+                                st.success("✅ 콘텐츠가 저장되었습니다!")
+                            except Exception as e:
+                                st.error(f"❌ 저장 실패: {e}")
+                    
                     # 복사용 코드 블록
                     st.markdown("**복사용:**")
                     st.code(generated_content, language=None)
@@ -892,7 +1116,7 @@ elif selected_menu == "🗑️ 수집 내용 관리":
             except Exception as e:
                 st.error(f"❌ 삭제 중 오류 발생: {e}")
 
-# 5. 경제 흐름 파악
+# 6. 경제 흐름 파악
 elif selected_menu == "📈 경제 흐름 파악":
     st.header("📈 경제 흐름 파악")
     
@@ -923,7 +1147,94 @@ elif selected_menu == "📈 경제 흐름 파악":
                     st.code(traceback.format_exc())
         
     
-    # 뉴스 헤드라인 표시
+    # 경제 흐름 대시보드
+    st.divider()
+    st.subheader("📊 경제 흐름 대시보드")
+    
+    try:
+        from modules.dashboard_utils import get_category_summary, get_trend_data, get_top_issues
+        import pandas as pd
+        
+        # 카테고리별 요약 카드
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            macro_summary = get_category_summary("거시경제", days=7)
+            st.markdown(f"""
+            <div style='padding: 15px; background-color: #f0f7ff; border-radius: 10px; border-left: 4px solid #4CAF50;'>
+                <h4 style='margin: 0 0 10px 0;'>📊 거시경제</h4>
+                <p style='font-size: 24px; font-weight: bold; margin: 5px 0;'>{macro_summary['count']}건</p>
+                <p style='font-size: 12px; margin: 5px 0;'><strong>주요 키워드:</strong> {', '.join(macro_summary['keywords'][:3]) if macro_summary['keywords'] else '없음'}</p>
+                <p style='font-size: 12px; margin: 5px 0;'>{macro_summary['trend']}</p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col2:
+            industry_summary = get_category_summary("산업분석", days=7)
+            st.markdown(f"""
+            <div style='padding: 15px; background-color: #fff7f0; border-radius: 10px; border-left: 4px solid #FF9800;'>
+                <h4 style='margin: 0 0 10px 0;'>🏭 산업분석</h4>
+                <p style='font-size: 24px; font-weight: bold; margin: 5px 0;'>{industry_summary['count']}건</p>
+                <p style='font-size: 12px; margin: 5px 0;'><strong>주요 키워드:</strong> {', '.join(industry_summary['keywords'][:3]) if industry_summary['keywords'] else '없음'}</p>
+                <p style='font-size: 12px; margin: 5px 0;'>{industry_summary['trend']}</p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col3:
+            global_summary = get_category_summary("글로벌시황", days=7)
+            st.markdown(f"""
+            <div style='padding: 15px; background-color: #f0fff0; border-radius: 10px; border-left: 4px solid #2196F3;'>
+                <h4 style='margin: 0 0 10px 0;'>🌍 글로벌시황</h4>
+                <p style='font-size: 24px; font-weight: bold; margin: 5px 0;'>{global_summary['count']}건</p>
+                <p style='font-size: 12px; margin: 5px 0;'><strong>주요 키워드:</strong> {', '.join(global_summary['keywords'][:3]) if global_summary['keywords'] else '없음'}</p>
+                <p style='font-size: 12px; margin: 5px 0;'>{global_summary['trend']}</p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        # 주요 이슈 하이라이트
+        st.subheader("🔥 오늘의 주요 이슈")
+        top_issues = get_top_issues(limit=5)
+        
+        if top_issues:
+            for idx, issue in enumerate(top_issues, 1):
+                st.markdown(f"""
+                <div style='padding: 12px; margin: 8px 0; background-color: #fff9e6; border-left: 4px solid #FFC107; border-radius: 5px;'>
+                    <p style='margin: 0; font-weight: bold;'>{idx}. {issue['title'][:80]}{'...' if len(issue['title']) > 80 else ''}</p>
+                    <p style='margin: 5px 0 0 0; font-size: 11px; color: #666;'>📅 {issue['date']} | 🏷️ 키워드 {issue['keyword_count']}개</p>
+                </div>
+                """, unsafe_allow_html=True)
+        else:
+            st.info("📭 주요 이슈가 없습니다.")
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        # 날짜별 트렌드 그래프
+        st.subheader("📈 최근 7일간 트렌드")
+        
+        macro_trend = get_trend_data("거시경제", days=7)
+        industry_trend = get_trend_data("산업분석", days=7)
+        global_trend = get_trend_data("글로벌시황", days=7)
+        
+        if macro_trend or industry_trend or global_trend:
+            trend_df = pd.DataFrame({
+                "날짜": [date for date, _ in macro_trend] if macro_trend else [],
+                "거시경제": [count for _, count in macro_trend] if macro_trend else [],
+                "산업분석": [count for _, count in industry_trend] if industry_trend else [],
+                "글로벌시황": [count for _, count in global_trend] if global_trend else []
+            })
+            
+            if not trend_df.empty:
+                st.line_chart(trend_df.set_index("날짜"))
+        else:
+            st.info("📭 트렌드 데이터가 없습니다.")
+        
+    except Exception as e:
+        st.error(f"❌ 대시보드 로드 실패: {e}")
+        import traceback
+        st.code(traceback.format_exc())
+    
     st.divider()
     st.subheader("📋 경제 뉴스 헤드라인")
     

@@ -99,6 +99,33 @@ def create_tables(conn):
         )
     """)
     
+    # generated_content 테이블 (생성된 콘텐츠 저장)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS generated_content (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            content_type TEXT NOT NULL,
+            title TEXT NOT NULL,
+            content TEXT NOT NULL,
+            source_ids TEXT,
+            tags TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    
+    # bookmarks 테이블 (북마크)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS bookmarks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            item_type TEXT NOT NULL,
+            item_id INTEGER NOT NULL,
+            tags TEXT,
+            notes TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(item_type, item_id)
+        )
+    """)
+    
     conn.commit()
     print("테이블 생성 완료")
 

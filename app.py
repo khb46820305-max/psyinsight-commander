@@ -656,7 +656,8 @@ with tab3:
                 status_text.text("AI 모델 초기화 중... (30%)")
                 progress_bar.progress(0.3)
                 
-                model = get_model()
+                # 모델 이름 명시적으로 지정 (404 에러 방지)
+                model = get_model("gemini-pro")  # gemini-pro 사용
                 
                 status_text.text("콘텐츠 생성 중... (60%)")
                 progress_bar.progress(0.6)

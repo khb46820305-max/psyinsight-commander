@@ -12,7 +12,7 @@ import json
 import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from modules.ai_engine import summarize_paper, extract_keywords
+from modules.ai_engine import summarize_paper, translate_abstract, extract_keywords
 from modules.database import get_connection
 from modules.journal_filter import is_reputable_journal, filter_papers_by_journal
 
@@ -261,70 +261,55 @@ def process_single_paper(paper: Dict) -> Optional[Dict]:
     
     abstract = paper.get("abstract", "")
     title = paper.get("title", "")
+    journal = paper.get("journal", "")
     if not abstract:
         return None
     
-    # AI 분석 (외국/국내 논문 abstract 모두 해석)
+    # 논문이 외국 논문인지 확인 (arXiv, PubMed, 영문 저널명 등)
+    is_foreign = journal.lower() in ["arxiv", "pubmed"] or any(char.isascii() and char.isalpha() for char in abstract[:100])
+    
+    # AI 분석
     try:
-        # Abstract를 상세히 해석 (목적, 방법, 결과, 시사점)
-        if abstract and len(abstract) > 50:
-            # 재시도 로직 강화
-            max_retries = 3
-            summary = None
-            
-            for retry in range(max_retries):
-                try:
-                    summary = summarize_paper(abstract[:3000])
-                    if summary and summary.get("purpose") and summary.get("purpose") not in ["요약 실패", "파싱 실패"]:
-                        break
-                except Exception as retry_error:
-                    logger.warning(f"Abstract 해석 재시도 {retry + 1}/{max_retries}: {retry_error}")
-                    if retry < max_retries - 1:
-                        time.sleep(2 ** retry)
-            
-            # Summary가 비어있거나 실패한 경우
-            if not summary or not summary.get("purpose") or summary.get("purpose") in ["요약 실패", "파싱 실패"]:
-                logger.warning(f"Abstract 해석 실패, 기본값 사용: {title[:50] if title else ''}")
-                summary = {
-                    "purpose": abstract[:200] + "..." if len(abstract) > 200 else abstract,
-                    "method": "",
-                    "result": "",
-                    "implication": ""
-                }
-            
-            # 키워드 추출
-            try:
-                keywords_list = extract_keywords(abstract[:3000], max_keywords=5)
-            except:
-                keywords_list = extract_keywords(title[:500], max_keywords=5) if title else []
+        abstract_translated = ""
+        summary = {}  # 한국 논문은 해석 요약 없음
+        
+        if is_foreign:
+            # 외국 논문: Abstract 한글 번역
+            abstract_translated = translate_abstract(abstract[:3000])
+            # 해석 요약은 제거하고 번역된 Abstract만 사용
+            summary = {}  # 빈 딕셔너리로 저장
         else:
-            # Abstract가 짧거나 없는 경우
-            summary = {
-                "purpose": abstract[:200] + "..." if abstract and len(abstract) > 200 else (abstract if abstract else ""),
-                "method": "",
-                "result": "",
-                "implication": ""
-            }
+            # 한국 논문: 해석 요약 없음, 원문 Abstract만 사용
+            abstract_translated = abstract
+            summary = {}
+        
+        # 키워드 추출
+        try:
+            keywords_list = extract_keywords(abstract[:3000], max_keywords=5)
+        except:
             keywords_list = extract_keywords(title[:500], max_keywords=5) if title else []
+            
     except Exception as e:
         logger.error(f"AI 분석 실패: {e}")
-        summary = {
-            "purpose": abstract[:200] + "..." if abstract and len(abstract) > 200 else (abstract if abstract else ""),
-            "method": "",
-            "result": "",
-            "implication": ""
-        }
+        abstract_translated = abstract
+        summary = {}
         keywords_list = extract_keywords(title[:500], max_keywords=5) if title else []
     
     # 데이터베이스에 저장
+    # Abstract에 번역 병기 (외국 논문인 경우)
+    if is_foreign and abstract_translated != abstract:
+        abstract_display = f"[원문]\n{abstract[:2000]}\n\n[한국어 번역]\n{abstract_translated[:2000]}"
+    else:
+        abstract_display = abstract
+    
     paper_data = {
         "date": paper.get("date", datetime.now().strftime("%Y-%m-%d")),
         "title": paper.get("title", ""),
         "authors": paper.get("authors", []),
         "journal": paper.get("journal", ""),
         "url": url,
-        "abstract": abstract[:5000],
-        "summary": summary,
+        "abstract": abstract_display[:5000],  # 번역 병기된 Abstract
+        "summary": summary,  # 빈 딕셔너리 (해석 요약 제거)
         "keywords": keywords_list,
         "category": paper.get("keyword", "psychology")
     }

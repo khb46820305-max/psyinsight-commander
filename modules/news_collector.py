@@ -13,7 +13,7 @@ import time
 import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from modules.ai_engine import generate_summary, evaluate_article, extract_keywords
+from modules.ai_engine import generate_summary, generate_news_summary_korean, translate_title, evaluate_article, extract_keywords
 from modules.database import get_connection
 
 # 로깅 설정
@@ -237,13 +237,21 @@ def process_single_news(news: Dict, country: str) -> Optional[Dict]:
     
     # AI 분석
     try:
-        if country == "US":  # 외국 뉴스만 요약
-            summary = generate_summary(full_text[:2000])
-            if not summary or summary == "요약 생성에 실패했습니다." or len(summary) > 100:
-                summary = summary[:50] + "..." if summary and len(summary) > 50 else (news.get('title', '')[:50] + "...")
-            else:
-                summary = summary[:50] + "..." if len(summary) > 50 else summary
+        title_original = news.get("title", "")
+        title_translated = ""
+        summary = ""
+        
+        if country == "US":  # 외국 뉴스
+            # 제목 번역
+            title_translated = translate_title(title_original)
+            # 100자 수준 한국어 요약
+            summary = generate_news_summary_korean(full_text[:2000])
+            if not summary or len(summary) > 150:
+                summary = summary[:100] + "..." if summary and len(summary) > 100 else (title_translated[:100] + "...")
+            # 제목에 번역 병기
+            title_display = f"{title_original} ({title_translated})"
         else:  # 국내 뉴스는 요약 없음
+            title_display = title_original
             summary = ""
         
         # 전문성 평가
@@ -255,8 +263,9 @@ def process_single_news(news: Dict, country: str) -> Optional[Dict]:
         
     except Exception as e:
         logger.error(f"AI 분석 실패: {e}")
+        title_display = news.get("title", "")
         if country == "US":
-            summary = news.get('title', '')[:50] + "..." if news.get('title') else ""
+            summary = news.get('title', '')[:100] + "..." if news.get('title') else ""
         else:
             summary = ""
         validity_score = 3
@@ -266,7 +275,7 @@ def process_single_news(news: Dict, country: str) -> Optional[Dict]:
     article_data = {
         "date": datetime.now().strftime("%Y-%m-%d"),
         "category": news.get("keyword", "psychology"),
-        "title": news.get("title", ""),
+        "title": title_display,  # 번역 병기된 제목 저장
         "url": url,
         "content_summary": summary,
         "full_text": full_text[:5000],

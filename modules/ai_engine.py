@@ -82,6 +82,90 @@ def get_model(model_name: str = None):
         raise
 
 
+def translate_title(title: str, max_retries: int = 3) -> str:
+    """
+    제목을 한국어로 번역
+    
+    Args:
+        title: 번역할 제목
+        max_retries: 최대 재시도 횟수
+    
+    Returns:
+        번역된 제목
+    """
+    prompt = f"""다음 제목을 한국어로 번역해주세요. 번역만 출력하세요.
+
+제목:
+{title}
+
+번역:"""
+    
+    for attempt in range(max_retries):
+        try:
+            model = get_model()
+            response = model.generate_content(
+                prompt,
+                generation_config={
+                    "temperature": 0.2,
+                    "max_output_tokens": 200,
+                }
+            )
+            translated = response.text.strip()
+            if translated and len(translated) > 5:
+                logger.info("제목 번역 완료")
+                return translated
+            else:
+                return title  # 번역 실패 시 원문 반환
+        except Exception as e:
+            logger.warning(f"제목 번역 실패 (시도 {attempt + 1}/{max_retries}): {e}")
+            if attempt == max_retries - 1:
+                return title
+            import time
+            time.sleep(2 ** attempt)
+
+
+def generate_news_summary_korean(text: str, max_retries: int = 3) -> str:
+    """
+    외국 뉴스를 한국어로 100자 수준으로 요약
+    
+    Args:
+        text: 요약할 텍스트
+        max_retries: 최대 재시도 횟수
+    
+    Returns:
+        100자 수준 한국어 요약
+    """
+    prompt = f"""다음 외국 뉴스 기사를 한국어로 100자 내외로 간략히 요약해주세요. 핵심 내용만 간결하게 담아주세요.
+
+기사 내용:
+{text[:2000]}
+
+한국어 요약:"""
+    
+    for attempt in range(max_retries):
+        try:
+            model = get_model()
+            response = model.generate_content(
+                prompt,
+                generation_config={
+                    "temperature": 0.3,
+                    "max_output_tokens": 200,
+                }
+            )
+            summary = response.text.strip()
+            if summary and len(summary) > 20:
+                logger.info("한국어 요약 생성 완료")
+                return summary
+            else:
+                raise ValueError("요약이 너무 짧거나 비어있습니다.")
+        except Exception as e:
+            logger.warning(f"한국어 요약 생성 실패 (시도 {attempt + 1}/{max_retries}): {e}")
+            if attempt == max_retries - 1:
+                return text[:100] + "..." if len(text) > 100 else text
+            import time
+            time.sleep(2 ** attempt)
+
+
 def generate_summary(text: str, max_retries: int = 3) -> str:
     """
     텍스트를 3줄로 요약
@@ -99,6 +183,25 @@ def generate_summary(text: str, max_retries: int = 3) -> str:
 {text}
 
 요약:"""
+
+
+def generate_news_summary_korean(text: str, max_retries: int = 3) -> str:
+    """
+    외국 뉴스를 한국어로 100자 수준으로 요약
+    
+    Args:
+        text: 요약할 텍스트
+        max_retries: 최대 재시도 횟수
+    
+    Returns:
+        100자 수준 한국어 요약
+    """
+    prompt = f"""다음 외국 뉴스 기사를 한국어로 100자 내외로 간략히 요약해주세요. 핵심 내용만 간결하게 담아주세요.
+
+기사 내용:
+{text[:2000]}
+
+한국어 요약:"""
     
     for attempt in range(max_retries):
         try:

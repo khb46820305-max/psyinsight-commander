@@ -210,20 +210,11 @@ with tab1:
         st.error(f"데이터베이스 조회 오류: {e}")
         st.info("데이터베이스가 초기화되지 않았을 수 있습니다. 사이드바에서 '데이터베이스 초기화' 버튼을 클릭하세요.")
     
-    # 맨 위로 버튼
+    # 맨 위로 버튼 (Streamlit rerun 사용)
     st.markdown("<div style='text-align: center; margin: 30px 0; padding: 20px;'>", unsafe_allow_html=True)
     if st.button("맨 위로 이동", key="scroll_top_tab1", use_container_width=False):
-        st.markdown("""
-        <script>
-        setTimeout(function() {
-            window.scrollTo({top: 0, behavior: 'smooth'});
-            document.documentElement.scrollTo({top: 0, behavior: 'smooth'});
-            document.body.scrollTo({top: 0, behavior: 'smooth'});
-            const stApp = document.querySelector('[data-testid="stApp"]');
-            if (stApp) stApp.scrollTo({top: 0, behavior: 'smooth'});
-        }, 100);
-        </script>
-        """, unsafe_allow_html=True)
+        # Streamlit은 버튼 클릭 시 자동으로 상단으로 이동
+        st.rerun()
     st.markdown("</div>", unsafe_allow_html=True)
 
 # Tab 2: 아카데믹 아카이브
@@ -404,6 +395,12 @@ with tab2:
             
     except Exception as e:
         st.error(f"데이터베이스 조회 오류: {e}")
+    
+    # 맨 위로 버튼 (Streamlit rerun 사용)
+    st.markdown("<div style='text-align: center; margin: 30px 0; padding: 20px;'>", unsafe_allow_html=True)
+    if st.button("맨 위로 이동", key="scroll_top_tab2", use_container_width=False):
+        st.rerun()
+    st.markdown("</div>", unsafe_allow_html=True)
 
 # Tab 3: 콘텐츠 팩토리
 with tab3:
@@ -532,6 +529,7 @@ with tab3:
 논문 아이디어:"""
                     }
                     
+                    from modules.ai_engine import get_model
                     model = get_model()
                     prompt = prompts.get(template, prompts["블로그 포스트"])
                     response = model.generate_content(
@@ -556,20 +554,10 @@ with tab3:
                 except Exception as e:
                     st.error(f"콘텐츠 생성 실패: {e}")
     
-    # 맨 위로 버튼
+    # 맨 위로 버튼 (Streamlit rerun 사용)
     st.markdown("<div style='text-align: center; margin: 30px 0; padding: 20px;'>", unsafe_allow_html=True)
     if st.button("맨 위로 이동", key="scroll_top_tab3", use_container_width=False):
-        st.markdown("""
-        <script>
-        setTimeout(function() {
-            window.scrollTo({top: 0, behavior: 'smooth'});
-            document.documentElement.scrollTo({top: 0, behavior: 'smooth'});
-            document.body.scrollTo({top: 0, behavior: 'smooth'});
-            const stApp = document.querySelector('[data-testid="stApp"]');
-            if (stApp) stApp.scrollTo({top: 0, behavior: 'smooth'});
-        }, 100);
-        </script>
-        """, unsafe_allow_html=True)
+        st.rerun()
     st.markdown("</div>", unsafe_allow_html=True)
 
 # Tab 4: 수집 내용 관리
@@ -694,20 +682,10 @@ with tab4:
     except Exception as e:
         st.error(f"논문 조회 오류: {e}")
     
-    # 맨 위로 버튼
+    # 맨 위로 버튼 (Streamlit rerun 사용)
     st.markdown("<div style='text-align: center; margin: 30px 0; padding: 20px;'>", unsafe_allow_html=True)
     if st.button("맨 위로 이동", key="scroll_top_tab4", use_container_width=False):
-        st.markdown("""
-        <script>
-        setTimeout(function() {
-            window.scrollTo({top: 0, behavior: 'smooth'});
-            document.documentElement.scrollTo({top: 0, behavior: 'smooth'});
-            document.body.scrollTo({top: 0, behavior: 'smooth'});
-            const stApp = document.querySelector('[data-testid="stApp"]');
-            if (stApp) stApp.scrollTo({top: 0, behavior: 'smooth'});
-        }, 100);
-        </script>
-        """, unsafe_allow_html=True)
+        st.rerun()
     st.markdown("</div>", unsafe_allow_html=True)
     
     st.divider()

@@ -43,7 +43,24 @@ def get_model(model_name: str = "gemini-1.5-flash"):
     """Gemini 모델 반환"""
     try:
         client = init_gemini_client()
-        return genai.GenerativeModel(model_name)
+        # 모델 이름 확인 및 수정
+        # v1beta API에서는 "gemini-1.5-flash" 대신 "gemini-1.5-flash-latest" 또는 "gemini-pro" 사용
+        # 최신 API에서는 "gemini-1.5-flash" 사용 가능
+        try:
+            model = genai.GenerativeModel(model_name)
+            return model
+        except Exception as e:
+            # 모델 이름이 지원되지 않으면 대체 모델 시도
+            logger.warning(f"모델 {model_name} 사용 실패, 대체 모델 시도: {e}")
+            alternative_models = ["gemini-1.5-flash-latest", "gemini-pro", "gemini-1.5-pro"]
+            for alt_model in alternative_models:
+                try:
+                    model = genai.GenerativeModel(alt_model)
+                    logger.info(f"대체 모델 사용: {alt_model}")
+                    return model
+                except:
+                    continue
+            raise ValueError(f"사용 가능한 모델을 찾을 수 없습니다: {model_name}")
     except Exception as e:
         logger.error(f"모델 초기화 실패: {e}")
         raise

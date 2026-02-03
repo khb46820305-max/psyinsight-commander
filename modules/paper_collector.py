@@ -13,6 +13,7 @@ import xml.etree.ElementTree as ET
 
 from modules.ai_engine import summarize_paper, extract_keywords
 from modules.database import get_connection
+from modules.journal_filter import is_reputable_journal, filter_papers_by_journal
 
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)
@@ -169,13 +170,17 @@ def fetch_papers_from_pubmed(keywords: List[str], max_results: int = 20) -> List
                 pub_date = article.find(".//PubDate/Year")
                 date = pub_date.text if pub_date is not None else datetime.now().strftime("%Y-%m-%d")
                 
+                # 학술지 이름 추출
+                journal_elem = article.find(".//Journal/Title")
+                journal_name = journal_elem.text if journal_elem is not None else "PubMed"
+                
                 paper = {
                     "title": title,
                     "abstract": abstract,
                     "authors": authors,
                     "url": url,
                     "date": date,
-                    "journal": "PubMed",
+                    "journal": journal_name,
                     "keyword": keyword
                 }
                 all_papers.append(paper)
@@ -261,12 +266,18 @@ def collect_and_analyze_papers(keywords: List[str] = None, sources: List[str] = 
     # arXiv 수집
     if "arxiv" in sources:
         arxiv_papers = fetch_papers_from_arxiv(keywords, max_per_keyword)
+        # arXiv는 기본적으로 peer-reviewed이므로 모두 포함
         all_papers.extend(arxiv_papers)
     
     # PubMed 수집 (선택)
     if "pubmed" in sources:
         pubmed_papers = fetch_papers_from_pubmed(keywords, max_per_keyword)
         all_papers.extend(pubmed_papers)
+    
+    # 저명 학술지 필터링
+    logger.info(f"저명 학술지 필터링 전: {len(all_papers)}개 논문")
+    all_papers = filter_papers_by_journal(all_papers)
+    logger.info(f"저명 학술지 필터링 후: {len(all_papers)}개 논문")
     
     for paper in all_papers:
         url = paper.get("url", "")
@@ -281,13 +292,30 @@ def collect_and_analyze_papers(keywords: List[str] = None, sources: List[str] = 
         if not abstract:
             continue
         
-        # AI 분석
+        # AI 분석 (외국 논문 abstract 해석)
         try:
+            # Abstract를 상세히 해석 (목적, 방법, 결과, 시사점)
             summary = summarize_paper(abstract[:3000])  # 최대 3000자
             keywords_list = extract_keywords(abstract[:3000], max_keywords=5)
+            
+            # Summary가 비어있으면 기본값 설정
+            if not summary or not summary.get("purpose"):
+                logger.warning(f"Abstract 해석 실패, 기본값 사용: {paper.get('title', '')[:50]}")
+                summary = {
+                    "purpose": abstract[:200] + "..." if len(abstract) > 200 else abstract,
+                    "method": "",
+                    "result": "",
+                    "implication": ""
+                }
         except Exception as e:
             logger.error(f"AI 분석 실패: {e}")
-            summary = {"purpose": "", "method": "", "result": "", "implication": ""}
+            # 실패 시 abstract의 첫 부분을 purpose로 사용
+            summary = {
+                "purpose": abstract[:200] + "..." if len(abstract) > 200 else abstract,
+                "method": "",
+                "result": "",
+                "implication": ""
+            }
             keywords_list = []
         
         # 데이터베이스에 저장

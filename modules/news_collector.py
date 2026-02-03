@@ -220,11 +220,44 @@ def collect_and_analyze_news(keywords: List[str] = None, countries: List[str] = 
     total_saved = 0
     
     for country in countries:
-        # 국가별 키워드 필터링
+        # 국가별 키워드 매핑 (같은 주제로 양쪽 모두 검색)
         if country == "KR":
-            country_keywords = [k for k in keywords if not k.isascii()]  # 한글 키워드
+            # 한국 뉴스: 한글 키워드 사용
+            country_keywords = [k for k in keywords if not k.isascii()]
+            # 한글 키워드가 없으면 영문 키워드를 한글로 변환하여 검색
+            if not country_keywords:
+                # 영문 키워드를 한글로 매핑
+                keyword_mapping = {
+                    "psychology": "심리학",
+                    "mental health": "정신건강",
+                    "counseling psychology": "상담심리",
+                    "clinical psychology": "임상심리",
+                    "depression": "우울증",
+                    "anxiety": "불안장애",
+                    "trauma": "트라우마"
+                }
+                country_keywords = [keyword_mapping.get(k, k) for k in keywords if k.isascii()]
         else:  # US
-            country_keywords = [k for k in keywords if k.isascii()]  # 영문 키워드
+            # 미국 뉴스: 영문 키워드 사용
+            country_keywords = [k for k in keywords if k.isascii()]
+            # 영문 키워드가 없으면 한글 키워드를 영문으로 변환하여 검색
+            if not country_keywords:
+                # 한글 키워드를 영문으로 매핑
+                keyword_mapping = {
+                    "정신건강": "mental health",
+                    "심리건강": "mental health",
+                    "마음건강": "mental health",
+                    "심리상담": "counseling",
+                    "심리학이론": "psychology theory",
+                    "심리학": "psychology",
+                    "정신건강증진": "mental health promotion",
+                    "우울증": "depression",
+                    "불안장애": "anxiety disorder",
+                    "트라우마": "trauma",
+                    "상담심리": "counseling psychology",
+                    "임상심리": "clinical psychology"
+                }
+                country_keywords = [keyword_mapping.get(k, "psychology") for k in keywords if not k.isascii()]
         
         if not country_keywords:
             continue

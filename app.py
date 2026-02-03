@@ -13,6 +13,39 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# 맨 위로 스크롤 버튼 JavaScript
+scroll_to_top_js = """
+<script>
+function scrollToTop() {
+    window.scrollTo({top: 0, behavior: 'smooth'});
+}
+</script>
+<style>
+.scroll-to-top-btn {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background-color: #1f77b4;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    font-size: 20px;
+    cursor: pointer;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.scroll-to-top-btn:hover {
+    background-color: #0d5a8a;
+}
+</style>
+"""
+st.markdown(scroll_to_top_js, unsafe_allow_html=True)
+
 # 제목
 st.title("🧠 PsyInsight Commander")
 st.markdown("### 심리 인사이트 통합 지휘소")
@@ -182,6 +215,13 @@ with tab1:
     except Exception as e:
         st.error(f"데이터베이스 조회 오류: {e}")
         st.info("데이터베이스가 초기화되지 않았을 수 있습니다. 사이드바에서 '데이터베이스 초기화' 버튼을 클릭하세요.")
+    
+    # 맨 위로 버튼
+    st.markdown("""
+    <div style="text-align: center; margin: 20px 0;">
+        <button onclick="scrollToTop()" class="scroll-to-top-btn" title="맨 위로">↑</button>
+    </div>
+    """, unsafe_allow_html=True)
 
 # Tab 2: 아카데믹 아카이브
 with tab2:
@@ -512,6 +552,13 @@ with tab3:
                     
                 except Exception as e:
                     st.error(f"콘텐츠 생성 실패: {e}")
+    
+    # 맨 위로 버튼
+    st.markdown("""
+    <div style="text-align: center; margin: 20px 0;">
+        <button onclick="scrollToTop()" class="scroll-to-top-btn" title="맨 위로">↑</button>
+    </div>
+    """, unsafe_allow_html=True)
 
 # Tab 4: 수집 내용 관리
 with tab4:
@@ -634,6 +681,13 @@ with tab4:
             
     except Exception as e:
         st.error(f"논문 조회 오류: {e}")
+    
+    # 맨 위로 버튼
+    st.markdown("""
+    <div style="text-align: center; margin: 20px 0;">
+        <button onclick="scrollToTop()" class="scroll-to-top-btn" title="맨 위로">↑</button>
+    </div>
+    """, unsafe_allow_html=True)
     
     st.divider()
     

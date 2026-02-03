@@ -213,21 +213,21 @@ def generate_news_summary_korean(text: str, max_retries: int = 3) -> str:
 
 def translate_abstract(abstract: str, max_retries: int = 3) -> str:
     """
-    외국 뉴스를 한국어로 100자 수준으로 요약
+    논문 Abstract를 한국어로 번역
     
     Args:
-        text: 요약할 텍스트
+        abstract: 번역할 Abstract
         max_retries: 최대 재시도 횟수
     
     Returns:
-        100자 수준 한국어 요약
+        번역된 Abstract
     """
-    prompt = f"""다음 외국 뉴스 기사를 한국어로 100자 내외로 간략히 요약해주세요. 핵심 내용만 간결하게 담아주세요.
+    prompt = f"""다음 논문 초록을 한국어로 번역해주세요. 전문 용어는 원문을 병기하세요.
 
-기사 내용:
-{text[:2000]}
+초록:
+{abstract[:3000]}
 
-한국어 요약:"""
+한국어 번역:"""
     
     for attempt in range(max_retries):
         try:
@@ -235,25 +235,22 @@ def translate_abstract(abstract: str, max_retries: int = 3) -> str:
             response = model.generate_content(
                 prompt,
                 generation_config={
-                    "temperature": 0.3,
-                    "max_output_tokens": 300,
+                    "temperature": 0.2,
+                    "max_output_tokens": 2000,
                 }
             )
-            summary = response.text.strip()
-            if summary and len(summary) > 10:  # 최소 길이 체크
-                logger.info("요약 생성 완료")
-                return summary
+            translated = response.text.strip()
+            if translated and len(translated) > 50:
+                logger.info("Abstract 번역 완료")
+                return translated
             else:
-                raise ValueError("요약이 너무 짧거나 비어있습니다.")
+                return abstract  # 번역 실패 시 원문 반환
         except Exception as e:
-            logger.warning(f"요약 생성 실패 (시도 {attempt + 1}/{max_retries}): {e}")
+            logger.warning(f"Abstract 번역 실패 (시도 {attempt + 1}/{max_retries}): {e}")
             if attempt == max_retries - 1:
-                # 텍스트의 첫 부분을 요약으로 사용
-                lines = text.split('\n')[:3]
-                fallback_summary = ' '.join([line.strip() for line in lines if line.strip()])[:200]
-                return fallback_summary if fallback_summary else "요약을 생성할 수 없습니다."
+                return abstract
             import time
-            time.sleep(2 ** attempt)  # 지수 백오프
+            time.sleep(2 ** attempt)
 
 
 def evaluate_article(text: str, max_retries: int = 3) -> Dict:

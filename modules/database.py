@@ -69,6 +69,23 @@ def create_tables(conn):
         )
     """)
     
+    # economy_news 테이블 (경제 뉴스)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS economy_news (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            date DATE NOT NULL,
+            category TEXT NOT NULL,
+            title TEXT NOT NULL,
+            url TEXT NOT NULL UNIQUE,
+            content_summary TEXT,
+            full_text TEXT,
+            keywords TEXT,
+            source TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            is_saved BOOLEAN DEFAULT 0
+        )
+    """)
+    
     conn.commit()
     print("테이블 생성 완료")
 

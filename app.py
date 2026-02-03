@@ -61,18 +61,58 @@ with tab1:
     with col1:
         st.markdown("미국과 한국의 심리 관련 뉴스를 수집하고 AI로 분석합니다.")
     with col2:
-        if st.button("🔄 뉴스 수집", type="primary"):
-            with st.spinner("뉴스 수집 중... (시간이 걸릴 수 있습니다)"):
+        col_btn1, col_btn2 = st.columns([1, 1])
+        with col_btn1:
+            if st.button("🔄 뉴스 수집 (20건)", type="primary"):
+                progress_bar = st.progress(0)
+                status_text = st.empty()
                 try:
                     from modules.news_collector import collect_and_analyze_news
+                    
+                    def update_progress(current, total, message):
+                        progress = current / total if total > 0 else 0
+                        progress_bar.progress(progress)
+                        status_text.text(f"{message} ({current}/{total}) - {int(progress * 100)}%")
+                    
                     collected, saved = collect_and_analyze_news(
                         keywords=["정신건강", "심리건강", "마음건강", "심리상담", "심리학이론", "심리학", "정신건강증진", "우울증", "불안장애", "트라우마", "상담심리", "임상심리"],
                         countries=["KR", "US"],
-                        max_per_keyword=5
+                        max_per_keyword=20,
+                        progress_callback=update_progress
                     )
+                    progress_bar.progress(1.0)
+                    status_text.text(f"✅ 수집 완료: {collected}개 수집, {saved}개 저장")
                     st.success(f"✅ 수집 완료: {collected}개 수집, {saved}개 저장")
                 except Exception as e:
                     st.error(f"❌ 오류 발생: {e}")
+                    import traceback
+                    st.code(traceback.format_exc())
+        
+        with col_btn2:
+            if st.button("➕ 추가 수집 (10건)", type="secondary"):
+                progress_bar = st.progress(0)
+                status_text = st.empty()
+                try:
+                    from modules.news_collector import collect_and_analyze_news
+                    
+                    def update_progress(current, total, message):
+                        progress = current / total if total > 0 else 0
+                        progress_bar.progress(progress)
+                        status_text.text(f"{message} ({current}/{total}) - {int(progress * 100)}%")
+                    
+                    collected, saved = collect_and_analyze_news(
+                        keywords=["정신건강", "심리건강", "마음건강", "심리상담", "심리학이론", "심리학", "정신건강증진", "우울증", "불안장애", "트라우마", "상담심리", "임상심리"],
+                        countries=["KR", "US"],
+                        max_per_keyword=10,
+                        progress_callback=update_progress
+                    )
+                    progress_bar.progress(1.0)
+                    status_text.text(f"✅ 추가 수집 완료: {collected}개 수집, {saved}개 저장")
+                    st.success(f"✅ 추가 수집 완료: {collected}개 수집, {saved}개 저장")
+                except Exception as e:
+                    st.error(f"❌ 오류 발생: {e}")
+                    import traceback
+                    st.code(traceback.format_exc())
     
     # 뉴스 목록 표시
     st.divider()
@@ -210,11 +250,20 @@ with tab1:
         st.error(f"데이터베이스 조회 오류: {e}")
         st.info("데이터베이스가 초기화되지 않았을 수 있습니다. 사이드바에서 '데이터베이스 초기화' 버튼을 클릭하세요.")
     
-    # 맨 위로 버튼 (Streamlit rerun 사용)
+    # 맨 위로 버튼
     st.markdown("<div style='text-align: center; margin: 30px 0; padding: 20px;'>", unsafe_allow_html=True)
     if st.button("맨 위로 이동", key="scroll_top_tab1", use_container_width=False):
-        # Streamlit은 버튼 클릭 시 자동으로 상단으로 이동
+        st.session_state.scroll_to_top = True
         st.rerun()
+    if st.session_state.get("scroll_to_top", False):
+        st.markdown("""
+        <script>
+        window.scrollTo(0, 0);
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
+        </script>
+        """, unsafe_allow_html=True)
+        st.session_state.scroll_to_top = False
     st.markdown("</div>", unsafe_allow_html=True)
 
 # Tab 2: 아카데믹 아카이브
@@ -225,19 +274,62 @@ with tab2:
     with col1:
         st.markdown("심리학 관련 논문을 수집하고 AI로 요약합니다.")
     with col2:
-        if st.button("🔄 논문 수집", type="primary"):
-            with st.spinner("논문 수집 중... (시간이 걸릴 수 있습니다)"):
+        col_btn1, col_btn2 = st.columns([1, 1])
+        with col_btn1:
+            if st.button("🔄 논문 수집 (10건)", type="primary"):
+                progress_bar = st.progress(0)
+                status_text = st.empty()
                 try:
                     from modules.paper_collector import collect_and_analyze_papers
+                    
+                    def update_progress(current, total, message):
+                        progress = current / total if total > 0 else 0
+                        progress_bar.progress(progress)
+                        status_text.text(f"{message} ({current}/{total}) - {int(progress * 100)}%")
+                    
                     collected, saved = collect_and_analyze_papers(
                         keywords=["psychology", "counseling psychology", "clinical psychology", "mental health"],
                         sources=["arxiv"],
-                        max_per_keyword=5
+                        max_per_keyword=10,
+                        progress_callback=update_progress
                     )
+                    progress_bar.progress(1.0)
                     if collected > 0:
+                        status_text.text(f"✅ 수집 완료: {collected}개 수집, {saved}개 저장")
                         st.success(f"✅ 수집 완료: {collected}개 수집, {saved}개 저장")
                     else:
+                        status_text.text("⚠️ 수집된 논문이 없습니다.")
                         st.warning("⚠️ 수집된 논문이 없습니다. 키워드를 확인해주세요.")
+                except Exception as e:
+                    st.error(f"❌ 오류 발생: {e}")
+                    import traceback
+                    st.code(traceback.format_exc())
+        
+        with col_btn2:
+            if st.button("➕ 추가 수집 (10건)", type="secondary"):
+                progress_bar = st.progress(0)
+                status_text = st.empty()
+                try:
+                    from modules.paper_collector import collect_and_analyze_papers
+                    
+                    def update_progress(current, total, message):
+                        progress = current / total if total > 0 else 0
+                        progress_bar.progress(progress)
+                        status_text.text(f"{message} ({current}/{total}) - {int(progress * 100)}%")
+                    
+                    collected, saved = collect_and_analyze_papers(
+                        keywords=["psychology", "counseling psychology", "clinical psychology", "mental health"],
+                        sources=["arxiv"],
+                        max_per_keyword=10,
+                        progress_callback=update_progress
+                    )
+                    progress_bar.progress(1.0)
+                    if collected > 0:
+                        status_text.text(f"✅ 추가 수집 완료: {collected}개 수집, {saved}개 저장")
+                        st.success(f"✅ 추가 수집 완료: {collected}개 수집, {saved}개 저장")
+                    else:
+                        status_text.text("⚠️ 수집된 논문이 없습니다.")
+                        st.warning("⚠️ 수집된 논문이 없습니다.")
                 except Exception as e:
                     st.error(f"❌ 오류 발생: {e}")
                     import traceback
@@ -396,10 +488,20 @@ with tab2:
     except Exception as e:
         st.error(f"데이터베이스 조회 오류: {e}")
     
-    # 맨 위로 버튼 (Streamlit rerun 사용)
+    # 맨 위로 버튼
     st.markdown("<div style='text-align: center; margin: 30px 0; padding: 20px;'>", unsafe_allow_html=True)
     if st.button("맨 위로 이동", key="scroll_top_tab2", use_container_width=False):
+        st.session_state.scroll_to_top_tab2 = True
         st.rerun()
+    if st.session_state.get("scroll_to_top_tab2", False):
+        st.markdown("""
+        <script>
+        window.scrollTo(0, 0);
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
+        </script>
+        """, unsafe_allow_html=True)
+        st.session_state.scroll_to_top_tab2 = False
     st.markdown("</div>", unsafe_allow_html=True)
 
 # Tab 3: 콘텐츠 팩토리
@@ -554,10 +656,20 @@ with tab3:
                 except Exception as e:
                     st.error(f"콘텐츠 생성 실패: {e}")
     
-    # 맨 위로 버튼 (Streamlit rerun 사용)
+    # 맨 위로 버튼
     st.markdown("<div style='text-align: center; margin: 30px 0; padding: 20px;'>", unsafe_allow_html=True)
     if st.button("맨 위로 이동", key="scroll_top_tab3", use_container_width=False):
+        st.session_state.scroll_to_top_tab3 = True
         st.rerun()
+    if st.session_state.get("scroll_to_top_tab3", False):
+        st.markdown("""
+        <script>
+        window.scrollTo(0, 0);
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
+        </script>
+        """, unsafe_allow_html=True)
+        st.session_state.scroll_to_top_tab3 = False
     st.markdown("</div>", unsafe_allow_html=True)
 
 # Tab 4: 수집 내용 관리
@@ -682,10 +794,20 @@ with tab4:
     except Exception as e:
         st.error(f"논문 조회 오류: {e}")
     
-    # 맨 위로 버튼 (Streamlit rerun 사용)
+    # 맨 위로 버튼
     st.markdown("<div style='text-align: center; margin: 30px 0; padding: 20px;'>", unsafe_allow_html=True)
     if st.button("맨 위로 이동", key="scroll_top_tab4", use_container_width=False):
+        st.session_state.scroll_to_top_tab4 = True
         st.rerun()
+    if st.session_state.get("scroll_to_top_tab4", False):
+        st.markdown("""
+        <script>
+        window.scrollTo(0, 0);
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
+        </script>
+        """, unsafe_allow_html=True)
+        st.session_state.scroll_to_top_tab4 = False
     st.markdown("</div>", unsafe_allow_html=True)
     
     st.divider()

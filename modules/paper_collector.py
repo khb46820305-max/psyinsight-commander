@@ -241,7 +241,7 @@ def save_paper_to_db(paper_data: Dict) -> bool:
         return False
 
 
-def collect_and_analyze_papers(keywords: List[str] = None, sources: List[str] = None, max_per_keyword: int = 10):
+def collect_and_analyze_papers(keywords: List[str] = None, sources: List[str] = None, max_per_keyword: int = 10, progress_callback=None):
     """
     논문 수집 및 AI 분석 메인 함수
     
@@ -293,7 +293,15 @@ def collect_and_analyze_papers(keywords: List[str] = None, sources: List[str] = 
     
     logger.info(f"저명 학술지: {len(reputable_papers)}개, 일반 학술지: {len(other_papers)}개")
     
+    # 전체 작업량 계산
+    total_work = len(all_papers)
+    current_work = 0
+    
     for paper in all_papers:
+        # 진행도 업데이트
+        if progress_callback:
+            current_work += 1
+            progress_callback(current_work, total_work, "논문 분석 중...")
         url = paper.get("url", "")
         
         if check_duplicate_paper(url):
@@ -306,31 +314,61 @@ def collect_and_analyze_papers(keywords: List[str] = None, sources: List[str] = 
         if not abstract:
             continue
         
-        # AI 분석 (외국 논문 abstract 해석)
+        # AI 분석 (외국/국내 논문 abstract 모두 해석)
         try:
             # Abstract를 상세히 해석 (목적, 방법, 결과, 시사점)
-            summary = summarize_paper(abstract[:3000])  # 최대 3000자
-            keywords_list = extract_keywords(abstract[:3000], max_keywords=5)
-            
-            # Summary가 비어있으면 기본값 설정
-            if not summary or not summary.get("purpose"):
-                logger.warning(f"Abstract 해석 실패, 기본값 사용: {paper.get('title', '')[:50]}")
+            if abstract and len(abstract) > 50:  # Abstract가 충분히 긴 경우만 해석
+                # 재시도 로직 강화
+                max_retries = 3
+                summary = None
+                
+                for retry in range(max_retries):
+                    try:
+                        summary = summarize_paper(abstract[:3000])  # 최대 3000자
+                        if summary and summary.get("purpose") and summary.get("purpose") not in ["요약 실패", "파싱 실패"]:
+                            break
+                    except Exception as retry_error:
+                        logger.warning(f"Abstract 해석 재시도 {retry + 1}/{max_retries}: {retry_error}")
+                        if retry < max_retries - 1:
+                            import time
+                            time.sleep(2 ** retry)
+                
+                # Summary가 비어있거나 실패한 경우
+                if not summary or not summary.get("purpose") or summary.get("purpose") in ["요약 실패", "파싱 실패"]:
+                    logger.warning(f"Abstract 해석 실패, 기본값 사용: {title[:50] if title else ''}")
+                    summary = {
+                        "purpose": abstract[:200] + "..." if len(abstract) > 200 else abstract,
+                        "method": "",
+                        "result": "",
+                        "implication": ""
+                    }
+                
+                # 키워드 추출
+                try:
+                    keywords_list = extract_keywords(abstract[:3000], max_keywords=5)
+                except:
+                    keywords_list = extract_keywords(title[:500], max_keywords=5) if title else []
+            else:
+                # Abstract가 짧거나 없는 경우
                 summary = {
-                    "purpose": abstract[:200] + "..." if len(abstract) > 200 else abstract,
+                    "purpose": abstract[:200] + "..." if abstract and len(abstract) > 200 else (abstract if abstract else ""),
                     "method": "",
                     "result": "",
                     "implication": ""
                 }
+                keywords_list = extract_keywords(title[:500], max_keywords=5) if title else []
         except Exception as e:
             logger.error(f"AI 분석 실패: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             # 실패 시 abstract의 첫 부분을 purpose로 사용
             summary = {
-                "purpose": abstract[:200] + "..." if len(abstract) > 200 else abstract,
+                "purpose": abstract[:200] + "..." if abstract and len(abstract) > 200 else (abstract if abstract else ""),
                 "method": "",
                 "result": "",
                 "implication": ""
             }
-            keywords_list = []
+            keywords_list = extract_keywords(title[:500], max_keywords=5) if title else []
         
         # 데이터베이스에 저장
         paper_data = {
@@ -347,6 +385,8 @@ def collect_and_analyze_papers(keywords: List[str] = None, sources: List[str] = 
         
         if save_paper_to_db(paper_data):
             total_saved += 1
+            if progress_callback:
+                progress_callback(current_work, total_work, f"저장 중... ({total_saved}개 저장됨)")
         
         time.sleep(1)  # Rate limiting
     

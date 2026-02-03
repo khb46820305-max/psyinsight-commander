@@ -199,7 +199,7 @@ def save_article_to_db(article_data: Dict) -> bool:
         return False
 
 
-def collect_and_analyze_news(keywords: List[str] = None, countries: List[str] = None, max_per_keyword: int = 10):
+def collect_and_analyze_news(keywords: List[str] = None, countries: List[str] = None, max_per_keyword: int = 10, progress_callback=None):
     """
     뉴스 수집 및 AI 분석을 수행하는 메인 함수
     
@@ -266,6 +266,10 @@ def collect_and_analyze_news(keywords: List[str] = None, countries: List[str] = 
         news_list = fetch_news_from_rss(country_keywords, country, max_per_keyword)
         
         for news in news_list:
+            # 진행도 업데이트
+            if progress_callback:
+                current_work += 1
+                progress_callback(current_work, total_work, f"뉴스 수집 중 ({country})...")
             url = news.get("url", "")
             
             # 중복 체크
@@ -292,12 +296,19 @@ def collect_and_analyze_news(keywords: List[str] = None, countries: List[str] = 
                 continue
             
             # AI 분석
+            # 외국 뉴스만 요약 생성, 국내 뉴스는 헤드라인만 사용
             try:
-                # 요약 생성
-                summary = generate_summary(full_text[:2000])  # 최대 2000자만 전달
-                if not summary or summary == "요약 생성에 실패했습니다.":
-                    # 제목을 기반으로 간단한 요약 생성
-                    summary = f"{news.get('title', '')[:100]}..."
+                if country == "US":  # 외국 뉴스만 요약
+                    # 요약 생성 (50자 내외)
+                    summary = generate_summary(full_text[:2000])  # 최대 2000자만 전달
+                    if not summary or summary == "요약 생성에 실패했습니다." or len(summary) > 100:
+                        # 요약이 너무 길면 50자로 제한
+                        summary = summary[:50] + "..." if summary and len(summary) > 50 else (news.get('title', '')[:50] + "...")
+                    else:
+                        # 50자 내외로 제한
+                        summary = summary[:50] + "..." if len(summary) > 50 else summary
+                else:  # 국내 뉴스는 요약 없음
+                    summary = ""  # 헤드라인이 곧 내용이므로 요약 없음
                 
                 # 전문성 평가
                 evaluation = evaluate_article(full_text[:2000])
@@ -309,7 +320,10 @@ def collect_and_analyze_news(keywords: List[str] = None, countries: List[str] = 
             except Exception as e:
                 logger.error(f"AI 분석 실패: {e}")
                 # 기본값 설정
-                summary = f"{news.get('title', '')[:100]}..." if news.get('title') else "요약을 생성할 수 없습니다."
+                if country == "US":
+                    summary = news.get('title', '')[:50] + "..." if news.get('title') else ""
+                else:
+                    summary = ""  # 국내 뉴스는 요약 없음
                 validity_score = 3
                 keywords_list = []
             
@@ -328,6 +342,8 @@ def collect_and_analyze_news(keywords: List[str] = None, countries: List[str] = 
             
             if save_article_to_db(article_data):
                 total_saved += 1
+                if progress_callback:
+                    progress_callback(current_work, total_work, f"저장 중... ({total_saved}개 저장됨)")
             
             # 요청 간격 조절
             time.sleep(2)

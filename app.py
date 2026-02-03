@@ -75,60 +75,6 @@ with st.sidebar:
     
     st.divider()
     
-    # 테스트 수집 버튼
-    if st.button("🧪 테스트 수집 (뉴스2개 + 논문2개)", type="secondary", key="test_collect_btn", use_container_width=True):
-        progress_bar = st.progress(0)
-        status_text = st.empty()
-        try:
-            from modules.news_collector import collect_and_analyze_news
-            from modules.paper_collector import collect_and_analyze_papers
-            
-            def update_progress(current, total, message):
-                progress = current / total if total > 0 else 0
-                progress_bar.progress(progress)
-                status_text.text(f"{message} ({current}/{total}) - {int(progress * 100)}%")
-            
-            # 1. 한국 뉴스 1개 수집
-            status_text.text("한국 뉴스 수집 중... (1/4)")
-            progress_bar.progress(0.1)
-            collected_kr, saved_kr = collect_and_analyze_news(
-                keywords=["심리건강"],
-                countries=["KR"],
-                max_per_keyword=1,
-                progress_callback=update_progress
-            )
-            
-            # 2. 외국 뉴스 1개 수집
-            status_text.text("외국 뉴스 수집 중... (2/4)")
-            progress_bar.progress(0.3)
-            collected_us, saved_us = collect_and_analyze_news(
-                keywords=["mental health"],
-                countries=["US"],
-                max_per_keyword=1,
-                progress_callback=update_progress
-            )
-            
-            # 3. 논문 수집
-            status_text.text("논문 수집 중... (3/4)")
-            progress_bar.progress(0.6)
-            collected_papers, saved_papers = collect_and_analyze_papers(
-                keywords=["psychology"],
-                sources=["arxiv"],
-                max_per_keyword=2,
-                progress_callback=update_progress
-            )
-            
-            progress_bar.progress(1.0)
-            status_text.text("✅ 테스트 수집 완료!")
-            st.success(f"✅ 테스트 수집 완료!\n- 한국 뉴스: {saved_kr}개 저장\n- 외국 뉴스: {saved_us}개 저장\n- 논문: {saved_papers}개 저장")
-            st.info("💡 각 메뉴에서 수집된 내용을 확인하세요.")
-        except Exception as e:
-            st.error(f"❌ 테스트 수집 실패: {e}")
-            import traceback
-            st.code(traceback.format_exc())
-    
-    st.divider()
-    
     # 데이터베이스 초기화 버튼
     if st.button("🗄️ 데이터베이스 초기화", use_container_width=True):
         try:
@@ -1119,16 +1065,186 @@ elif selected_menu == "📈 경제 흐름 파악":
 
 # 6. 테스트
 elif selected_menu == "🧪 테스트":
-    st.header("🧪 테스트")
-    st.info("테스트 수집은 좌측 사이드바의 '테스트 수집' 버튼을 사용하세요.")
-    st.markdown("""
-    ### 테스트 수집 기능
-    - 한국 뉴스 1개 수집
-    - 외국 뉴스 1개 수집
-    - 논문 2개 수집
+    st.header("🧪 테스트 수집")
+    st.markdown("### 빠른 테스트를 위한 수집 기능")
+    st.info("한국 뉴스 1개, 외국 뉴스 1개, 논문 2개를 수집하여 테스트합니다.")
     
-    좌측 사이드바에서 "🧪 테스트 수집 (뉴스2개 + 논문2개)" 버튼을 클릭하세요.
-    """)
+    # 테스트 수집 버튼
+    if st.button("🧪 테스트 수집 시작 (뉴스2개 + 논문2개)", type="primary", key="test_collect_btn_main"):
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+        test_results = {"kr_news": [], "us_news": [], "papers": []}
+        
+        try:
+            from modules.news_collector import collect_and_analyze_news
+            from modules.paper_collector import collect_and_analyze_papers
+            from modules.database import get_connection
+            
+            def update_progress(current, total, message):
+                progress = current / total if total > 0 else 0
+                progress_bar.progress(progress)
+                status_text.text(f"{message} ({current}/{total}) - {int(progress * 100)}%")
+            
+            # 1. 한국 뉴스 1개 수집
+            status_text.text("한국 뉴스 수집 중... (1/4)")
+            progress_bar.progress(0.1)
+            collected_kr, saved_kr = collect_and_analyze_news(
+                keywords=["심리건강"],
+                countries=["KR"],
+                max_per_keyword=1,
+                progress_callback=update_progress
+            )
+            
+            # 최근 수집된 한국 뉴스 가져오기
+            if saved_kr > 0:
+                conn = get_connection()
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT id, title, date, country, url, content_summary, keywords, rating
+                    FROM news
+                    WHERE country = 'KR'
+                    ORDER BY created_at DESC
+                    LIMIT 1
+                """)
+                test_results["kr_news"] = cursor.fetchall()
+                conn.close()
+            
+            # 2. 외국 뉴스 1개 수집
+            status_text.text("외국 뉴스 수집 중... (2/4)")
+            progress_bar.progress(0.3)
+            collected_us, saved_us = collect_and_analyze_news(
+                keywords=["mental health"],
+                countries=["US"],
+                max_per_keyword=1,
+                progress_callback=update_progress
+            )
+            
+            # 최근 수집된 외국 뉴스 가져오기
+            if saved_us > 0:
+                conn = get_connection()
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT id, title, date, country, url, content_summary, keywords, rating, translated_title, summary_korean
+                    FROM news
+                    WHERE country = 'US'
+                    ORDER BY created_at DESC
+                    LIMIT 1
+                """)
+                test_results["us_news"] = cursor.fetchall()
+                conn.close()
+            
+            # 3. 논문 수집
+            status_text.text("논문 수집 중... (3/4)")
+            progress_bar.progress(0.6)
+            collected_papers, saved_papers = collect_and_analyze_papers(
+                keywords=["psychology"],
+                sources=["arxiv"],
+                max_per_keyword=2,
+                progress_callback=update_progress
+            )
+            
+            # 최근 수집된 논문 가져오기
+            if saved_papers > 0:
+                conn = get_connection()
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT id, title, date, source, url, abstract, keywords, abstract_korean
+                    FROM papers
+                    WHERE source = 'arXiv'
+                    ORDER BY created_at DESC
+                    LIMIT 2
+                """)
+                test_results["papers"] = cursor.fetchall()
+                conn.close()
+            
+            progress_bar.progress(1.0)
+            status_text.text("✅ 테스트 수집 완료!")
+            
+            # 결과 표시
+            st.success(f"✅ 테스트 수집 완료!\n- 한국 뉴스: {saved_kr}개 저장\n- 외국 뉴스: {saved_us}개 저장\n- 논문: {saved_papers}개 저장")
+            
+            # 수집된 내용 표시
+            st.divider()
+            st.subheader("📋 수집된 내용")
+            
+            # 한국 뉴스 표시
+            if test_results["kr_news"]:
+                st.markdown("#### 🇰🇷 한국 뉴스")
+                for news in test_results["kr_news"]:
+                    news_id, title, date, country, url, summary, keywords, rating = news
+                    st.markdown(f"**{title}**")
+                    st.markdown(f"📅 {date} | ⭐ {rating}/5")
+                    if summary:
+                        st.markdown(f"요약: {summary[:100]}...")
+                    if url:
+                        st.markdown(f"[원문 보기 →]({url})")
+                    st.markdown("---")
+            
+            # 외국 뉴스 표시
+            if test_results["us_news"]:
+                st.markdown("#### 🌍 외국 뉴스")
+                for news in test_results["us_news"]:
+                    if len(news) >= 10:
+                        news_id, title, date, country, url, summary, keywords, rating, translated_title, summary_korean = news
+                        if translated_title:
+                            st.markdown(f"**{translated_title}** (원제: {title})")
+                        else:
+                            st.markdown(f"**{title}**")
+                        st.markdown(f"📅 {date} | ⭐ {rating}/5")
+                        if summary_korean:
+                            st.markdown(f"요약: {summary_korean}")
+                        elif summary:
+                            st.markdown(f"요약: {summary[:100]}...")
+                        if url:
+                            st.markdown(f"[원문 보기 →]({url})")
+                    else:
+                        news_id, title, date, country, url, summary, keywords, rating = news
+                        st.markdown(f"**{title}**")
+                        st.markdown(f"📅 {date} | ⭐ {rating}/5")
+                        if summary:
+                            st.markdown(f"요약: {summary[:100]}...")
+                        if url:
+                            st.markdown(f"[원문 보기 →]({url})")
+                    st.markdown("---")
+            
+            # 논문 표시
+            if test_results["papers"]:
+                st.markdown("#### 📚 논문")
+                for paper in test_results["papers"]:
+                    if len(paper) >= 8:
+                        paper_id, title, date, source, url, abstract, keywords, abstract_korean = paper
+                        st.markdown(f"**{title}**")
+                        st.markdown(f"📅 {date} | 📖 {source}")
+                        if abstract_korean:
+                            with st.expander("📄 Abstract (한국어 번역)"):
+                                st.markdown(f"**원문:**\n{abstract[:500]}...")
+                                st.markdown(f"**한국어 번역:**\n{abstract_korean}")
+                        else:
+                            with st.expander("📄 Abstract"):
+                                st.markdown(abstract[:500] + "..." if len(abstract) > 500 else abstract)
+                        if url:
+                            st.markdown(f"[원문 보기 →]({url})")
+                    else:
+                        paper_id, title, date, source, url, abstract, keywords = paper
+                        st.markdown(f"**{title}**")
+                        st.markdown(f"📅 {date} | 📖 {source}")
+                        with st.expander("📄 Abstract"):
+                            st.markdown(abstract[:500] + "..." if len(abstract) > 500 else abstract)
+                        if url:
+                            st.markdown(f"[원문 보기 →]({url})")
+                    st.markdown("---")
+            
+            if not test_results["kr_news"] and not test_results["us_news"] and not test_results["papers"]:
+                st.info("수집된 내용이 없습니다. 이미 수집된 내용이거나 중복된 항목일 수 있습니다.")
+                
+        except Exception as e:
+            st.error(f"❌ 테스트 수집 실패: {e}")
+            import traceback
+            st.code(traceback.format_exc())
+    
+    # 이전 테스트 결과가 있으면 표시
+    else:
+        st.info("위의 '테스트 수집 시작' 버튼을 클릭하여 테스트를 진행하세요.")
 
 # 7. 설정
 elif selected_menu == "⚙️ 설정":

@@ -29,42 +29,32 @@ HEADERS = {
 def fetch_bok_reports(max_results: int = 10) -> List[Dict]:
     """
     한국은행 이슈노트 및 경제전망 수집
-    
-    Returns:
-        보고서 딕셔너리 리스트
+    Google News RSS를 통해 한국은행 관련 뉴스 수집
     """
     reports = []
     try:
-        # 한국은행 RSS Feed 또는 웹사이트 스크래핑
-        # 실제 구현 시 한국은행 웹사이트 구조에 맞게 수정 필요
-        rss_url = "https://www.bok.or.kr/portal/bbs/B0000245/list.do?menuNo=200761"
+        # Google News RSS를 통한 한국은행 관련 뉴스 수집
+        rss_url = "https://news.google.com/rss/search?q=한국은행+경제+금리+통화정책&hl=ko&gl=KR&ceid=KR:ko"
         
-        # RSS Feed가 없으면 웹 스크래핑
-        response = requests.get(rss_url, headers=HEADERS, timeout=10)
-        response.raise_for_status()
+        feed = feedparser.parse(rss_url)
         
-        soup = BeautifulSoup(response.content, 'html.parser')
-        
-        # 보고서 링크 및 제목 추출 (실제 구조에 맞게 수정 필요)
-        items = soup.select('a[href*="view.do"]')[:max_results]
-        
-        for item in items:
-            title = item.get_text(strip=True)
-            url = "https://www.bok.or.kr" + item.get('href', '')
+        for entry in feed.entries[:max_results]:
+            title = entry.get("title", "").replace(" - Google 뉴스", "").strip()
+            url = entry.get("link", "")
             
-            if title and '경제' in title or '금리' in title or '통화' in title:
+            if title and url:
                 reports.append({
                     "title": title,
                     "url": url,
-                    "source": "한국은행",
+                    "source": "한국은행 (Google News)",
                     "category": "거시경제",
-                    "date": datetime.now().strftime("%Y-%m-%d")
+                    "date": entry.get("published", datetime.now().strftime("%Y-%m-%d"))
                 })
         
-        logger.info(f"한국은행 보고서 {len(reports)}개 수집")
+        logger.info(f"한국은행 관련 뉴스 {len(reports)}개 수집")
         
     except Exception as e:
-        logger.error(f"한국은행 보고서 수집 실패: {e}")
+        logger.error(f"한국은행 뉴스 수집 실패: {e}")
     
     return reports
 
@@ -72,40 +62,32 @@ def fetch_bok_reports(max_results: int = 10) -> List[Dict]:
 def fetch_kdi_reports(max_results: int = 10) -> List[Dict]:
     """
     KDI 경제동향 수집
-    
-    Returns:
-        보고서 딕셔너리 리스트
+    Google News RSS를 통해 KDI 관련 뉴스 수집
     """
     reports = []
     try:
-        # KDI 웹사이트 스크래핑
-        url = "https://www.kdi.re.kr/kdi_etc/issue/issue_list.jsp"
+        # Google News RSS를 통한 KDI 관련 뉴스 수집
+        rss_url = "https://news.google.com/rss/search?q=KDI+한국개발연구원+경제동향&hl=ko&gl=KR&ceid=KR:ko"
         
-        response = requests.get(url, headers=HEADERS, timeout=10)
-        response.raise_for_status()
+        feed = feedparser.parse(rss_url)
         
-        soup = BeautifulSoup(response.content, 'html.parser')
-        
-        # 경제동향 관련 링크 추출 (실제 구조에 맞게 수정 필요)
-        items = soup.select('a[href*="issue_view"]')[:max_results]
-        
-        for item in items:
-            title = item.get_text(strip=True)
-            url = "https://www.kdi.re.kr" + item.get('href', '')
+        for entry in feed.entries[:max_results]:
+            title = entry.get("title", "").replace(" - Google 뉴스", "").strip()
+            url = entry.get("link", "")
             
-            if title:
+            if title and url:
                 reports.append({
                     "title": title,
                     "url": url,
-                    "source": "KDI",
+                    "source": "KDI (Google News)",
                     "category": "거시경제",
-                    "date": datetime.now().strftime("%Y-%m-%d")
+                    "date": entry.get("published", datetime.now().strftime("%Y-%m-%d"))
                 })
         
-        logger.info(f"KDI 보고서 {len(reports)}개 수집")
+        logger.info(f"KDI 관련 뉴스 {len(reports)}개 수집")
         
     except Exception as e:
-        logger.error(f"KDI 보고서 수집 실패: {e}")
+        logger.error(f"KDI 뉴스 수집 실패: {e}")
     
     return reports
 
@@ -144,27 +126,29 @@ def fetch_hankyung_consensus(max_results: int = 20) -> List[Dict]:
 def fetch_naver_finance(max_results: int = 20) -> List[Dict]:
     """
     네이버 금융 리서치 수집
-    
-    Returns:
-        리포트 딕셔너리 리스트
+    Google News RSS를 통해 네이버 금융 관련 뉴스 수집
     """
     reports = []
     try:
-        # 네이버 금융 RSS Feed
-        rss_url = "https://finance.naver.com/news/rss/news_list.naver?mode=LSS2D&section_id=101&section_id2=258"
+        # Google News RSS를 통한 네이버 금융 관련 뉴스 수집
+        rss_url = "https://news.google.com/rss/search?q=네이버+금융+경제+증권+시장&hl=ko&gl=KR&ceid=KR:ko"
         
         feed = feedparser.parse(rss_url)
         
         for entry in feed.entries[:max_results]:
-            reports.append({
-                "title": entry.get("title", ""),
-                "url": entry.get("link", ""),
-                "source": "네이버 금융",
-                "category": "산업분석",
-                "date": entry.get("published", datetime.now().strftime("%Y-%m-%d"))
-            })
+            title = entry.get("title", "").replace(" - Google 뉴스", "").strip()
+            url = entry.get("link", "")
+            
+            if title and url:
+                reports.append({
+                    "title": title,
+                    "url": url,
+                    "source": "네이버 금융 (Google News)",
+                    "category": "산업분석",
+                    "date": entry.get("published", datetime.now().strftime("%Y-%m-%d"))
+                })
         
-        logger.info(f"네이버 금융 {len(reports)}개 수집")
+        logger.info(f"네이버 금융 관련 뉴스 {len(reports)}개 수집")
         
     except Exception as e:
         logger.error(f"네이버 금융 수집 실패: {e}")
@@ -175,33 +159,71 @@ def fetch_naver_finance(max_results: int = 20) -> List[Dict]:
 def fetch_investing_news(max_results: int = 20) -> List[Dict]:
     """
     Investing.com 뉴스 수집
-    
-    Returns:
-        뉴스 딕셔너리 리스트
+    Google News RSS를 통해 글로벌 경제 뉴스 수집
     """
     news_list = []
     try:
-        # Investing.com RSS Feed
-        rss_url = "https://www.investing.com/rss/news.rss"
+        # Google News RSS를 통한 글로벌 경제 뉴스 수집
+        rss_url = "https://news.google.com/rss/search?q=economy+fed+rate+gdp+inflation+market&hl=en&gl=US&ceid=US:en"
         
         feed = feedparser.parse(rss_url)
         
         for entry in feed.entries[:max_results]:
-            # 경제 관련 키워드 필터링
-            title = entry.get("title", "").lower()
-            if any(kw in title for kw in ["economy", "fed", "rate", "gdp", "inflation", "market"]):
+            title = entry.get("title", "").replace(" - Google News", "").strip()
+            url = entry.get("link", "")
+            
+            if title and url:
                 news_list.append({
-                    "title": entry.get("title", ""),
-                    "url": entry.get("link", ""),
-                    "source": "Investing.com",
+                    "title": title,
+                    "url": url,
+                    "source": "Investing.com (Google News)",
                     "category": "글로벌시황",
                     "date": entry.get("published", datetime.now().strftime("%Y-%m-%d"))
                 })
         
-        logger.info(f"Investing.com {len(news_list)}개 수집")
+        logger.info(f"글로벌 경제 뉴스 {len(news_list)}개 수집")
         
     except Exception as e:
-        logger.error(f"Investing.com 수집 실패: {e}")
+        logger.error(f"글로벌 경제 뉴스 수집 실패: {e}")
+    
+    return news_list
+
+
+def fetch_daily_economy_news(max_results: int = 30) -> List[Dict]:
+    """
+    일일 경제 뉴스 수집 (Google News RSS)
+    오늘 날짜의 경제 관련 뉴스 수집
+    """
+    news_list = []
+    try:
+        # Google News RSS를 통한 일일 경제 뉴스 수집
+        keywords = ["경제", "금리", "통화정책", "GDP", "인플레이션", "증시", "환율", "부동산", "고용"]
+        today = datetime.now().strftime("%Y-%m-%d")
+        
+        for keyword in keywords[:3]:  # 상위 3개 키워드만 사용
+            rss_url = f"https://news.google.com/rss/search?q={keyword}&hl=ko&gl=KR&ceid=KR:ko&when:1d"
+            
+            feed = feedparser.parse(rss_url)
+            
+            for entry in feed.entries[:max_results//3]:
+                title = entry.get("title", "").replace(" - Google 뉴스", "").strip()
+                url = entry.get("link", "")
+                
+                if title and url and title not in [n.get("title") for n in news_list]:
+                    news_list.append({
+                        "title": title,
+                        "url": url,
+                        "source": "일일 경제 뉴스",
+                        "category": "거시경제",
+                        "date": entry.get("published", today)
+                    })
+            
+            time.sleep(0.2)  # API 호출 간격
+        
+        logger.info(f"일일 경제 뉴스 {len(news_list)}개 수집")
+        
+    except Exception as e:
+        logger.error(f"일일 경제 뉴스 수집 실패: {e}")
     
     return news_list
 
@@ -209,40 +231,32 @@ def fetch_investing_news(max_results: int = 20) -> List[Dict]:
 def fetch_kcif_news(max_results: int = 20) -> List[Dict]:
     """
     국제금융센터 일일 브리핑 수집
-    
-    Returns:
-        뉴스 딕셔너리 리스트
+    Google News RSS를 통해 국제금융센터 관련 뉴스 수집
     """
     news_list = []
     try:
-        # 국제금융센터 웹사이트 스크래핑
-        url = "https://www.kcif.or.kr/main.do"
+        # Google News RSS를 통한 국제금융센터 관련 뉴스 수집
+        rss_url = "https://news.google.com/rss/search?q=국제금융센터+KCIF+글로벌+금융&hl=ko&gl=KR&ceid=KR:ko"
         
-        response = requests.get(url, headers=HEADERS, timeout=10)
-        response.raise_for_status()
+        feed = feedparser.parse(rss_url)
         
-        soup = BeautifulSoup(response.content, 'html.parser')
-        
-        # 일일 브리핑 링크 추출 (실제 구조에 맞게 수정 필요)
-        items = soup.select('a[href*="daily"]')[:max_results]
-        
-        for item in items:
-            title = item.get_text(strip=True)
-            url = "https://www.kcif.or.kr" + item.get('href', '')
+        for entry in feed.entries[:max_results]:
+            title = entry.get("title", "").replace(" - Google 뉴스", "").strip()
+            url = entry.get("link", "")
             
-            if title:
+            if title and url:
                 news_list.append({
                     "title": title,
                     "url": url,
-                    "source": "국제금융센터",
+                    "source": "국제금융센터 (Google News)",
                     "category": "글로벌시황",
-                    "date": datetime.now().strftime("%Y-%m-%d")
+                    "date": entry.get("published", datetime.now().strftime("%Y-%m-%d"))
                 })
         
-        logger.info(f"국제금융센터 {len(news_list)}개 수집")
+        logger.info(f"국제금융센터 관련 뉴스 {len(news_list)}개 수집")
         
     except Exception as e:
-        logger.error(f"국제금융센터 수집 실패: {e}")
+        logger.error(f"국제금융센터 뉴스 수집 실패: {e}")
     
     return news_list
 
@@ -415,11 +429,11 @@ def collect_economy_news(progress_callback=None):
     if progress_callback:
         progress_callback(1, 6, "거시경제 정보 수집 중...")
     
-    bok_reports = fetch_bok_reports(max_results=5)
+    bok_reports = fetch_bok_reports(max_results=15)
     all_items.extend(bok_reports)
     time.sleep(0.3)
     
-    kdi_reports = fetch_kdi_reports(max_results=5)
+    kdi_reports = fetch_kdi_reports(max_results=15)
     all_items.extend(kdi_reports)
     time.sleep(0.3)
     
@@ -428,11 +442,11 @@ def collect_economy_news(progress_callback=None):
     if progress_callback:
         progress_callback(2, 6, "산업 분석 정보 수집 중...")
     
-    hankyung_reports = fetch_hankyung_consensus(max_results=10)
+    hankyung_reports = fetch_hankyung_consensus(max_results=20)
     all_items.extend(hankyung_reports)
     time.sleep(0.3)
     
-    naver_reports = fetch_naver_finance(max_results=10)
+    naver_reports = fetch_naver_finance(max_results=20)
     all_items.extend(naver_reports)
     time.sleep(0.3)
     
@@ -441,12 +455,21 @@ def collect_economy_news(progress_callback=None):
     if progress_callback:
         progress_callback(3, 6, "글로벌 시황 정보 수집 중...")
     
-    investing_news = fetch_investing_news(max_results=10)
+    investing_news = fetch_investing_news(max_results=20)
     all_items.extend(investing_news)
     time.sleep(0.3)
     
-    kcif_news = fetch_kcif_news(max_results=10)
+    kcif_news = fetch_kcif_news(max_results=20)
     all_items.extend(kcif_news)
+    time.sleep(0.3)
+    
+    # 4. 일일 경제 뉴스 추가 수집 (Google News)
+    logger.info("일일 경제 뉴스 수집 중...")
+    if progress_callback:
+        progress_callback(3, 6, "일일 경제 뉴스 수집 중...")
+    
+    daily_economy_news = fetch_daily_economy_news(max_results=30)
+    all_items.extend(daily_economy_news)
     time.sleep(0.3)
     
     # 전체 작업량 계산

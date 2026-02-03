@@ -45,9 +45,9 @@ def fetch_news_from_rss(keywords: List[str], country: str = "KR", max_results: i
             if country == "KR":
                 # 심리/상담 관련 키워드만 필터링
                 search_query = keyword
-                # 제외 키워드 추가 (법률 상담, 디지털 상담 등 제외)
+                # 제외 키워드 추가 (법률 상담, 디지털 상담 등 제외, 단 IT는 AI/뇌과학 관련이므로 제외하지 않음)
                 if "상담" in keyword or "심리" in keyword:
-                    search_query = f"{keyword} -법률 -법무 -디지털 -IT -건설 -공제회"
+                    search_query = f"{keyword} -법률 -법무 -디지털 -건설 -공제회"
                 rss_url = f"https://news.google.com/rss/search?q={search_query}&hl=ko&gl=KR&ceid=KR:ko"
             else:  # US
                 rss_url = f"https://news.google.com/rss/search?q={keyword}&hl=en&gl=US&ceid=US:en"

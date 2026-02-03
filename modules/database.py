@@ -86,6 +86,17 @@ def create_tables(conn):
         )
     """)
     
+    # economy_reports 테이블 (경제 종합 보고서)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS economy_reports (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            date DATE NOT NULL UNIQUE,
+            report_text TEXT NOT NULL,
+            news_count INTEGER,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    
     conn.commit()
     print("테이블 생성 완료")
 

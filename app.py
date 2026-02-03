@@ -913,34 +913,94 @@ elif selected_menu == "📈 경제 흐름 파악":
                         progress_bar.progress(progress)
                         status_text.text(f"{message} ({current}/{total}) - {int(progress * 100)}%")
                     
-                    collected, saved = collect_economy_news(progress_callback=update_progress)
-                    progress_bar.progress(1.0)
+                collected, saved = collect_economy_news(progress_callback=update_progress)
+                progress_bar.progress(0.9)
+                status_text.text(f"✅ 수집 완료: {collected}개 수집, {saved}개 저장")
+                
+                # 수집 완료 후 자동으로 보고서 생성 시도
+                if saved > 0:
+                    status_text.text("📊 종합 보고서 자동 생성 중...")
+                    try:
+                        from modules.economy_collector import generate_daily_economy_report
+                        from datetime import datetime
+                        
+                        report = generate_daily_economy_report(force_regenerate=False)
+                        
+                        if report:
+                            st.session_state['economy_report'] = report
+                            st.session_state['economy_report_date'] = datetime.now().strftime("%Y-%m-%d")
+                            status_text.text(f"✅ 수집 완료: {collected}개 수집, {saved}개 저장 | 📊 보고서 자동 생성 완료")
+                            st.success(f"✅ 수집 완료: {collected}개 수집, {saved}개 저장\n📊 종합 보고서가 자동으로 생성되었습니다!")
+                        else:
+                            status_text.text(f"✅ 수집 완료: {collected}개 수집, {saved}개 저장")
+                            st.success(f"✅ 수집 완료: {collected}개 수집, {saved}개 저장")
+                    except Exception as e:
+                        logger.error(f"보고서 자동 생성 실패: {e}")
+                        status_text.text(f"✅ 수집 완료: {collected}개 수집, {saved}개 저장")
+                        st.success(f"✅ 수집 완료: {collected}개 수집, {saved}개 저장")
+                else:
                     status_text.text(f"✅ 수집 완료: {collected}개 수집, {saved}개 저장")
                     st.success(f"✅ 수집 완료: {collected}개 수집, {saved}개 저장")
+                
+                progress_bar.progress(1.0)
                 except Exception as e:
                     st.error(f"❌ 오류 발생: {e}")
                     import traceback
                     st.code(traceback.format_exc())
         
         with col_btn2:
-            if st.button("📊 종합 보고서 생성", type="secondary", key="economy_report_btn"):
-                try:
-                    from modules.economy_collector import generate_daily_economy_report
-                    from datetime import datetime
-                    
-                    with st.spinner("일일 경제 종합 보고서 생성 중..."):
-                        report = generate_daily_economy_report()
+            col_report1, col_report2 = st.columns([1, 1])
+            with col_report1:
+                if st.button("📊 보고서 생성", type="secondary", key="economy_report_btn"):
+                    try:
+                        from modules.economy_collector import generate_daily_economy_report, check_report_exists, get_report_from_db
+                        from datetime import datetime
                         
-                        if report:
-                            st.success("✅ 종합 보고서 생성 완료!")
-                            st.session_state['economy_report'] = report
-                            st.session_state['economy_report_date'] = datetime.now().strftime("%Y-%m-%d")
+                        today = datetime.now().strftime("%Y-%m-%d")
+                        
+                        # 기존 보고서 확인
+                        if check_report_exists(today):
+                            existing_report = get_report_from_db(today)
+                            if existing_report:
+                                st.info("ℹ️ 오늘 날짜의 보고서가 이미 존재합니다. 아래에서 확인하세요.")
+                                st.session_state['economy_report'] = existing_report
+                                st.session_state['economy_report_date'] = today
+                            else:
+                                st.warning("⚠️ 보고서 이력은 있지만 내용을 불러올 수 없습니다.")
                         else:
-                            st.warning("⚠️ 보고서 생성 실패. 먼저 경제 뉴스를 수집해주세요.")
-                except Exception as e:
-                    st.error(f"❌ 오류 발생: {e}")
-                    import traceback
-                    st.code(traceback.format_exc())
+                            with st.spinner("일일 경제 종합 보고서 생성 중..."):
+                                report = generate_daily_economy_report(force_regenerate=False)
+                                
+                                if report:
+                                    st.success("✅ 종합 보고서 생성 완료!")
+                                    st.session_state['economy_report'] = report
+                                    st.session_state['economy_report_date'] = today
+                                else:
+                                    st.warning("⚠️ 보고서 생성 실패. 먼저 경제 뉴스를 수집해주세요.")
+                    except Exception as e:
+                        st.error(f"❌ 오류 발생: {e}")
+                        import traceback
+                        st.code(traceback.format_exc())
+            
+            with col_report2:
+                if st.button("🔄 보고서 재생성", type="secondary", key="economy_report_regenerate_btn"):
+                    try:
+                        from modules.economy_collector import generate_daily_economy_report
+                        from datetime import datetime
+                        
+                        with st.spinner("보고서 재생성 중..."):
+                            report = generate_daily_economy_report(force_regenerate=True)
+                            
+                            if report:
+                                st.success("✅ 보고서 재생성 완료!")
+                                st.session_state['economy_report'] = report
+                                st.session_state['economy_report_date'] = datetime.now().strftime("%Y-%m-%d")
+                            else:
+                                st.warning("⚠️ 보고서 재생성 실패. 먼저 경제 뉴스를 수집해주세요.")
+                    except Exception as e:
+                        st.error(f"❌ 오류 발생: {e}")
+                        import traceback
+                        st.code(traceback.format_exc())
     
     # 종합 보고서 표시
     if 'economy_report' in st.session_state and st.session_state.get('economy_report'):

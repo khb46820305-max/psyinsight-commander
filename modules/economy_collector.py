@@ -630,19 +630,102 @@ def collect_economy_news(progress_callback=None):
     return total_collected, total_saved
 
 
-def generate_daily_economy_report(date: str = None) -> Optional[str]:
+def check_report_exists(date: str) -> bool:
+    """
+    해당 날짜의 보고서가 이미 생성되었는지 확인
+    
+    Args:
+        date: 확인할 날짜
+    
+    Returns:
+        보고서 존재 여부
+    """
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM economy_reports WHERE date = ?", (date,))
+        result = cursor.fetchone()
+        conn.close()
+        return result is not None
+    except Exception as e:
+        logger.error(f"보고서 존재 확인 실패: {e}")
+        return False
+
+
+def save_report_to_db(date: str, report_text: str, news_count: int) -> bool:
+    """
+    생성된 보고서를 데이터베이스에 저장
+    
+    Args:
+        date: 보고서 날짜
+        report_text: 보고서 내용
+        news_count: 사용된 뉴스 개수
+    
+    Returns:
+        저장 성공 여부
+    """
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        
+        # 기존 보고서가 있으면 업데이트, 없으면 삽입
+        cursor.execute("""
+            INSERT OR REPLACE INTO economy_reports (date, report_text, news_count, created_at)
+            VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+        """, (date, report_text, news_count))
+        
+        conn.commit()
+        conn.close()
+        logger.info(f"보고서 저장 완료: {date}")
+        return True
+    except Exception as e:
+        logger.error(f"보고서 저장 실패: {e}")
+        return False
+
+
+def get_report_from_db(date: str) -> Optional[str]:
+    """
+    데이터베이스에서 보고서 조회
+    
+    Args:
+        date: 조회할 날짜
+    
+    Returns:
+        보고서 텍스트 (없으면 None)
+    """
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT report_text FROM economy_reports WHERE date = ?", (date,))
+        result = cursor.fetchone()
+        conn.close()
+        return result[0] if result else None
+    except Exception as e:
+        logger.error(f"보고서 조회 실패: {e}")
+        return None
+
+
+def generate_daily_economy_report(date: str = None, force_regenerate: bool = False) -> Optional[str]:
     """
     일일 경제 종합 보고서 생성
     수집된 모든 경제 뉴스를 종합하여 하나의 보고서로 작성
     
     Args:
         date: 보고서 날짜 (None이면 오늘 날짜)
+        force_regenerate: 기존 보고서가 있어도 재생성할지 여부
     
     Returns:
         종합 보고서 텍스트 (실패 시 None)
     """
     if date is None:
         date = datetime.now().strftime("%Y-%m-%d")
+    
+    # 기존 보고서 확인 (재생성 강제가 아닌 경우)
+    if not force_regenerate:
+        existing_report = get_report_from_db(date)
+        if existing_report:
+            logger.info(f"{date} 날짜의 보고서가 이미 존재합니다.")
+            return existing_report
     
     try:
         conn = get_connection()
@@ -755,6 +838,10 @@ def generate_daily_economy_report(date: str = None) -> Optional[str]:
             
             report = response.text.strip()
             logger.info(f"일일 경제 종합 보고서 생성 완료: {len(report)}자")
+            
+            # 보고서를 데이터베이스에 저장
+            save_report_to_db(date, report, len(all_news))
+            
             return report
             
         except Exception as e:

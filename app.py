@@ -119,7 +119,7 @@ with tab1:
             order_by = "validity_score ASC, created_at DESC"
         
         # 페이지네이션
-        page_size = 10
+        page_size = 20
         page = st.number_input("페이지", min_value=1, value=1, step=1, key="news_page")
         offset = (page - 1) * page_size
         
@@ -139,9 +139,9 @@ with tab1:
         conn.close()
         
         if articles:
-            st.markdown(f"### 📄 뉴스 목록 (총 {len(articles)}개 표시)")
+            st.markdown(f"<h4 style='font-size: 16px; margin-bottom: 10px;'>📄 뉴스 목록 (총 {len(articles)}개 표시)</h4>", unsafe_allow_html=True)
             
-            for article in articles:
+            for idx, article in enumerate(articles):
                 article_id, date, title, url, summary, keywords_json, score, country = article
                 
                 # 키워드 파싱
@@ -155,25 +155,26 @@ with tab1:
                     col1, col2 = st.columns([4, 1])
                     
                     with col1:
-                        st.markdown(f"#### {title}")
-                        st.markdown(f"📅 {date} | 🌍 {country} | ⭐ {score}/5")
+                        st.markdown(f"<h5 style='font-size: 14px; font-weight: bold; margin-bottom: 5px;'>{title}</h5>", unsafe_allow_html=True)
+                        st.markdown(f"<p style='font-size: 11px; color: #666; margin-bottom: 5px;'>📅 {date} | 🌍 {country} | ⭐ {score}/5</p>", unsafe_allow_html=True)
                         
                         if summary:
-                            st.markdown(f"**요약:** {summary}")
+                            st.markdown(f"<p style='font-size: 12px; margin-bottom: 5px;'><strong>요약:</strong> {summary[:150]}{'...' if len(summary) > 150 else ''}</p>", unsafe_allow_html=True)
                         
                         if keywords:
                             keyword_tags = " ".join([f"`{k}`" for k in keywords[:3]])
-                            st.markdown(f"**키워드:** {keyword_tags}")
+                            st.markdown(f"<p style='font-size: 11px; margin-bottom: 5px;'><strong>키워드:</strong> {keyword_tags}</p>", unsafe_allow_html=True)
                         
                         if url:
-                            st.markdown(f"[원문 보기 →]({url})")
+                            st.markdown(f"<a href='{url}' target='_blank' style='font-size: 11px;'>원문 보기 →</a>", unsafe_allow_html=True)
                     
                     with col2:
                         # 평점 시각화
-                        st.markdown(f"### ⭐{score}")
+                        st.markdown(f"<p style='font-size: 16px; margin-bottom: 5px; text-align: center;'>⭐{score}</p>", unsafe_allow_html=True)
                         st.progress(score / 5)
                     
-                    st.divider()
+                    if idx < len(articles) - 1:
+                        st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
         else:
             st.info("📭 저장된 뉴스가 없습니다. 위의 '뉴스 수집' 버튼을 클릭하여 뉴스를 수집하세요.")
             
@@ -264,7 +265,7 @@ with tab2:
         order_by = "created_at DESC" if sort_option == "최신순" else "created_at ASC"
         
         # 페이지네이션
-        page_size = 10
+        page_size = 20
         page = st.number_input("페이지", min_value=1, value=1, step=1, key="paper_page")
         offset = (page - 1) * page_size
         
@@ -284,9 +285,9 @@ with tab2:
         conn.close()
         
         if papers:
-            st.markdown(f"### 📄 논문 목록 (총 {len(papers)}개 표시)")
+            st.markdown(f"<h4 style='font-size: 16px; margin-bottom: 10px;'>📄 논문 목록 (총 {len(papers)}개 표시)</h4>", unsafe_allow_html=True)
             
-            for paper in papers:
+            for idx, paper in enumerate(papers):
                 paper_id, date, title, authors_json, journal, url, abstract, summary_json, keywords_json, category = paper
                 
                 try:
@@ -299,38 +300,40 @@ with tab2:
                     keywords = []
                 
                 with st.container():
-                    st.markdown(f"#### {title}")
-                    st.markdown(f"📅 {date} | 📖 {journal} | 🏷️ {category}")
+                    st.markdown(f"<h5 style='font-size: 14px; font-weight: bold; margin-bottom: 5px;'>{title}</h5>", unsafe_allow_html=True)
+                    st.markdown(f"<p style='font-size: 11px; color: #666; margin-bottom: 5px;'>📅 {date} | 📖 {journal} | 🏷️ {category}</p>", unsafe_allow_html=True)
                     
                     if authors:
                         authors_str = ", ".join(authors[:3])
                         if len(authors) > 3:
                             authors_str += f" 외 {len(authors) - 3}명"
-                        st.markdown(f"**저자:** {authors_str}")
+                        st.markdown(f"<p style='font-size: 11px; margin-bottom: 5px;'><strong>저자:</strong> {authors_str}</p>", unsafe_allow_html=True)
                     
                     if summary:
-                        with st.expander("📋 요약 보기"):
+                        with st.expander("📋 요약 보기", expanded=False):
                             if summary.get("purpose"):
-                                st.markdown(f"**목적:** {summary['purpose']}")
+                                st.markdown(f"<p style='font-size: 11px;'><strong>목적:</strong> {summary['purpose']}</p>", unsafe_allow_html=True)
                             if summary.get("method"):
-                                st.markdown(f"**방법:** {summary['method']}")
+                                st.markdown(f"<p style='font-size: 11px;'><strong>방법:</strong> {summary['method']}</p>", unsafe_allow_html=True)
                             if summary.get("result"):
-                                st.markdown(f"**결과:** {summary['result']}")
+                                st.markdown(f"<p style='font-size: 11px;'><strong>결과:</strong> {summary['result']}</p>", unsafe_allow_html=True)
                             if summary.get("implication"):
-                                st.markdown(f"**시사점:** {summary['implication']}")
+                                st.markdown(f"<p style='font-size: 11px;'><strong>시사점:</strong> {summary['implication']}</p>", unsafe_allow_html=True)
                     
                     if abstract:
-                        with st.expander("📄 초록 보기"):
-                            st.markdown(abstract[:500] + "..." if len(abstract) > 500 else abstract)
+                        with st.expander("📄 초록 보기", expanded=False):
+                            abstract_text = abstract[:300] + "..." if len(abstract) > 300 else abstract
+                            st.markdown(f"<p style='font-size: 11px;'>{abstract_text}</p>", unsafe_allow_html=True)
                     
                     if keywords:
                         keyword_tags = " ".join([f"`{k}`" for k in keywords[:3]])
-                        st.markdown(f"**키워드:** {keyword_tags}")
+                        st.markdown(f"<p style='font-size: 11px; margin-bottom: 5px;'><strong>키워드:</strong> {keyword_tags}</p>", unsafe_allow_html=True)
                     
                     if url:
-                        st.markdown(f"[원문 보기 →]({url})")
+                        st.markdown(f"<a href='{url}' target='_blank' style='font-size: 11px;'>원문 보기 →</a>", unsafe_allow_html=True)
                     
-                    st.divider()
+                    if idx < len(papers) - 1:
+                        st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
         else:
             st.info("📭 저장된 논문이 없습니다. 위의 '논문 수집' 버튼을 클릭하여 논문을 수집하세요.")
             

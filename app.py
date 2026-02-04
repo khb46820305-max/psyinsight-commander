@@ -94,11 +94,19 @@ if selected_menu == "🏠 대시보드":
     st.markdown("전체 프로젝트의 주요 인사이트를 한눈에 확인합니다.")
     
     try:
-        from modules.database import get_connection
+        from modules.database import get_connection, init_database
         from datetime import datetime, timedelta
         import json
         from collections import Counter
         import pandas as pd
+        
+        # 데이터베이스 초기화 확인 (최초 실행 시)
+        try:
+            conn = get_connection()
+            conn.close()
+        except:
+            # 초기화 실패 시 명시적으로 초기화
+            init_database()
         
         conn = get_connection()
         cursor = conn.cursor()

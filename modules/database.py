@@ -25,8 +25,25 @@ def init_database():
 
 
 def get_connection():
-    """데이터베이스 연결 반환"""
-    return sqlite3.connect(DB_FILE)
+    """데이터베이스 연결 반환 (디렉토리 및 테이블 자동 생성)"""
+    # 디렉토리가 없으면 생성
+    DB_DIR.mkdir(exist_ok=True)
+    
+    # 데이터베이스 연결
+    conn = sqlite3.connect(DB_FILE)
+    
+    # 테이블이 없으면 생성 (최초 실행 시)
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='articles'")
+        if cursor.fetchone() is None:
+            # 테이블이 없으면 생성
+            create_tables(conn)
+    except:
+        # 오류 발생 시에도 테이블 생성 시도
+        create_tables(conn)
+    
+    return conn
 
 
 def create_tables(conn):

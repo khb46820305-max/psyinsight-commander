@@ -17,6 +17,16 @@ if 'scroll_to_top_tab4' not in st.session_state:
 if 'scroll_to_top_tab5' not in st.session_state:
     st.session_state.scroll_to_top_tab5 = False
 
+# 데이터베이스 자동 초기화 (최초 실행 시)
+if 'db_initialized' not in st.session_state:
+    try:
+        from modules.database import init_database
+        init_database()
+        st.session_state.db_initialized = True
+    except Exception:
+        # 초기화 실패해도 계속 진행 (get_connection에서 재시도)
+        st.session_state.db_initialized = True
+
 # 페이지 설정
 st.set_page_config(
     page_title="PsyInsight Commander",
